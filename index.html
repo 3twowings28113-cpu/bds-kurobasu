@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BDSクロバス | 関西大学ビジネスデータサイエンス学部 学生専用</title>
+<meta name="description" content="関西大学ビジネスデータサイエンス学部の学生による、学生のための情報共有アプリ。授業の口コミ・評価配分・過去問・ゼミ情報・カレンダー・教科書売買。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&family=Noto+Serif+JP:wght@700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="topbar-in">
+    <a class="brand" href="#" data-nav="home">
+      <span class="brand-mark">BDS</span>
+      <span class="brand-name">クロバス<small>関西大学 ビジネスデータサイエンス学部 学生専用</small></span>
+    </a>
+    <nav class="mainnav" id="mainnav">
+      <button data-nav="home" class="active">ホーム</button>
+      <button data-nav="courses">授業を探す</button>
+      <button data-nav="zemi">ゼミ一覧</button>
+      <button data-nav="calendar">カレンダー</button>
+      <button data-nav="books">教科書売買</button>
+      <button data-nav="board">掲示板</button>
+    </nav>
+    <div class="userbox" id="userbox"></div>
+  </div>
+</header>
+
+<main id="app"></main>
+
+<footer class="footer">
+  <div class="footer-in">
+    <p><strong>BDSクロバス</strong> ― 関西大学ビジネスデータサイエンス学部の学生同士で、授業・ゼミ・日程の情報を分け合う場所です。</p>
+    <p class="small">授業データは関西大学公式シラバス（2026年度・ビジネスデータサイエンス学部 専門教育科目）をもとに作成しています。口コミ・過去問・ゼミ情報は学生の投稿です。個人が特定される書き込み、試験問題の著作権に触れる転載はしないでください。</p>
+    <p class="small">このサービスは学生有志による非公式のものです。大学公式の情報は必ず公式シラバス・関大LMSで確認してください。</p>
+  </div>
+</footer>
+
+<div id="modal-root"></div>
+<script src="data.js"></script>
+<script src="zemi.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
