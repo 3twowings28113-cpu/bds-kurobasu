@@ -31,7 +31,7 @@ function renderUserbox(){
   const box = document.getElementById("userbox");
   if(user){
     box.innerHTML = '<span class="chip">'+esc(user.grade)+'回生 '+esc(user.name)+'</span><button id="logoutBtn" class="ubtn">登録を変更</button>';
-    document.getElementById("logoutBtn").onclick = () => { if(confirm("登録情報を消して、最初の登録画面に戻りますか？（投稿した内容はこの端末に残ります）")){ localStorage.removeItem("bds_user"); user=null; renderUserbox(); showGate(); } };
+    document.getElementById("logoutBtn").onclick = () => { showGate(); };
   } else {
     box.innerHTML = '<button id="loginBtn" class="ubtn solid">学生登録</button>';
     document.getElementById("loginBtn").onclick = showGate;
@@ -49,8 +49,8 @@ function showGate(){
   + '<div class="field"><label>学部</label><select id="gFac"><option>ビジネスデータサイエンス学部</option><option>その他の学部（関大生）</option></select></div>'
   + '</div>'
   + '<p class="note">※ 学籍番号は形式チェックだけに使い、保存も送信もしません。</p>'
-  + '<button class="btn" id="gateSubmit" style="width:100%">登録してはじめる</button>'
-  + (user ? '<button class="btn ghost" id="gateCancel" style="width:100%;margin-top:8px">キャンセル</button>' : '')
+  + '<button class="btn" id="gateSubmit" style="width:100%">'+(user ? '登録を変更する' : '登録してはじめる')+'</button>'
+  + (user ? '<button class="btn ghost" id="gateCancel" style="width:100%;margin-top:8px">キャンセル</button><button id="gateDelete" style="width:100%;margin-top:10px;background:none;border:0;color:#9B2226;font-size:13px">登録情報を消す（投稿はこの端末に残ります）</button>' : '')
   + '</div></div>';
   const err = document.getElementById("gateErr");
   document.getElementById("gateSubmit").onclick = () => {
@@ -70,6 +70,8 @@ function showGate(){
   };
   const cancel = document.getElementById("gateCancel");
   if(cancel) cancel.onclick = () => { $modal.innerHTML=""; };
+  const del = document.getElementById("gateDelete");
+  if(del) del.onclick = () => { localStorage.removeItem("bds_user"); user=null; $modal.innerHTML=""; renderUserbox(); toast("登録情報を消しました"); route(); };
 }
 function requireUser(){
   if(user) return true;
@@ -125,8 +127,8 @@ function route(){
   const p = parseHash();
   window.scrollTo(0,0);
   if(p[0]==="courses"){ setNav("courses"); renderCourses(); }
-  else if(p[0]==="course" && p[1]){ setNav("courses"); renderCourseDetail(p[1], p[2]||courseTab); }
-  else if(p[0]==="zemi" && p[1]){ setNav("zemi"); renderZemiDetail(p[1], p[2]||zemiTab); }
+  else if(p[0]==="course" && p[1]){ setNav("courses"); renderCourseDetail(p[1], p[2]||"syllabus"); }
+  else if(p[0]==="zemi" && p[1]){ setNav("zemi"); renderZemiDetail(p[1], p[2]||"about"); }
   else if(p[0]==="zemi"){ setNav("zemi"); renderZemi(); }
   else if(p[0]==="calendar"){ setNav("calendar"); renderCalendar(); }
   else if(p[0]==="books"){ setNav("books"); renderBooks(); }
@@ -269,9 +271,9 @@ function renderCourseDetail(name, tab){
   if(courseTab==="syllabus"){
     body = '<section class="panel"><h3>シラバス情報</h3>'
     + '<div class="kv"><span>担当</span><p>'+esc(c.instructor)+'</p></div>'
-    + '<div class="kv"><span>学期・曜限</span><p>'+esc(c.term||"")+' '+esc(c.schedule||"")+' ／ '+esc(c.credits||"")+'単位'+(c.class? ' ／ クラス: '+esc(c.class):'')+'</p></div>'
+    + '<div class="kv"><span>学期・曜限</span><p>'+esc(c.term||"")+' '+esc(c.schedule||"")+' ／ '+esc(c.credits||"")+'単位'+(c.cls? ' ／ クラス: '+esc(c.cls):'')+'</p></div>'
     + '<div class="kv"><span>評価配分</span><div>'+gbar(c)+'</div></div>'
-    + (c.gradingText? '<div class="kv"><span>評価方法（原文）</span><p class="pre">'+esc(c.gradingText)+'</p></div>':'')
+    + (c.grading? '<div class="kv"><span>評価方法（原文）</span><p class="pre">'+esc(c.grading)+'</p></div>':'')
     + (c.desc? '<div class="kv"><span>授業概要</span><p class="pre">'+esc(c.desc)+'</p></div>':'')
     + (c.textbook? '<div class="kv"><span>教科書</span><p class="pre">'+esc(c.textbook)+'</p></div>':'')
     + '<div class="kv"><span>公式シラバス</span><p>'+(c.url? '<a href="'+esc(c.url)+'" target="_blank" rel="noopener">公式シラバスで原文を見る</a>' : '未取得')+'</p></div>'
@@ -500,7 +502,7 @@ function renderBooks(){
       const msgs = bk.msgs || [];
       return '<article class="bookcard">'
       + '<div class="book-main"><div><span class="tag '+(bk.type==="buy"?"buy":"sell")+'">'+(bk.type==="buy"?"買います":"売ります")+'</span> <strong>'+esc(bk.title)+'</strong> <span class="tag st-'+esc(bk.status||"open")+'">'+bookStatusLabel(bk.status||"open")+'</span>'
-      + '<div class="card-meta">'+(bk.course? '授業: '+esc(bk.course)+' ／ ':'')+'状態: '+esc(bk.cond||"-")+'<br>手渡し: '+esc(bk.place||"応相談")+(bk.when? ' ／ 希望: '+esc(bk.when):'')+(bk.note? '<br>'+esc(bk.note):'')+(bk.contact? '<br>連絡先: '+esc(bk.contact):'')+'<br><span class="dim">'+esc(bk.by||"")+'（'+esc(bk.grade||"")+'回生） ・ '+esc(bk.date||"")+'</span></div></div>'
+      + '<div class="card-meta">'+(bk.course? '授業: '+esc(bk.course)+' ／ ':'')+(bk.type==="buy" ? '希望の状態: '+esc(bk.cond==="新品同様" ? "指定なし" : (bk.cond||"指定なし")) : '状態: '+esc(bk.cond||"-"))+'<br>手渡し: '+esc(bk.place||"応相談")+(bk.when? ' ／ 希望: '+esc(bk.when):'')+(bk.note? '<br>'+esc(bk.note):'')+(bk.contact? '<br>連絡先: '+esc(bk.contact):'')+'<br><span class="dim">'+esc(bk.by||"")+'（'+esc(bk.grade||"")+'回生） ・ '+esc(bk.date||"")+'</span></div></div>'
       + '<div class="price">¥'+Number(bk.price||0).toLocaleString()+'</div></div>'
       + '<div class="book-actions"><button class="btn small ghost" data-thread="'+esc(bk.id)+'">連絡する（'+msgs.length+'）</button>'
       + (mine && bk.status!=="done" ? '<button class="btn small ghost" data-st="'+esc(bk.id)+'">状態を変更（'+(bk.status==="open"?"交渉中にする":"取引完了にする")+'）</button>' : '')
