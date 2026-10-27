@@ -61,7 +61,7 @@ function showGate(){
     if(!name){ err.style.display="block"; err.textContent="名前を入力してください（ニックネームでOKです）"; return; }
     if(!/^k\d{6}$/.test(sid)){ err.style.display="block"; err.textContent="学籍番号の形式が違います。「k + 数字6桁」で入力してください。例: k924030"; return; }
     if(!grade){ err.style.display="block"; err.textContent="学年を選んでください"; return; }
-    user = { name, sid, grade, fac };
+    user = { name, grade, fac }; /* 学籍番号は形式チェックだけに使い、保存しない */
     save("bds_user", user);
     $modal.innerHTML = "";
     renderUserbox();
