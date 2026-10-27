@@ -19,6 +19,7 @@ let zemiInfo = load("bds_zemi_info", {});
 let events = load("bds_events", null);
 let books = load("bds_books", null);
 let board = load("bds_board", null);
+let candidates = load("bds_candidates", []);
 if(!events){ events = []; save("bds_events", events); }
 if(!books){ books = []; save("bds_books", books); }
 if(!board){ board = [
@@ -176,12 +177,21 @@ function courseCard(c){
   return '<article class="card"><h3><a href="#" data-course="'+esc(c.name)+'">'+esc(c.name)+'</a></h3>'
   + '<div class="meta">'+esc(c.instructor)+' ／ '+esc(c.term)+'学期 '+esc(c.schedule)+' ／ '+esc(c.credits)+'単位'+(c.cls?' ／ クラス'+esc(c.cls):'')+'</div>'
   + gbar(c)
-  + '<div class="tagrow">'+ c.tags.map(t=>'<span class="tag">'+esc(t)+'</span>').join("") + (c.noExam?'<span class="tag ok">定期テストなし</span>':'') + (ec?'<span class="tag warn">過去問 '+ec+'件</span>':'') +'</div>'
-  + '<div class="meta">'+(a?('<span class="stars">'+stars(a)+'</span> 取りやすさ '+a.toFixed(1)+'（口コミ'+rc+'件）'):'口コミはまだありません')+'</div>'
+  + '<div class="tagrow">'+ c.tags.map(t=>'<span class="tag">'+esc(t)+'</span>').join("") + (c.noExam?'<span class="tag ok">定期テストなし</span>':'') + (GCATS.reduce((s,[k])=>s+(c.cats[k]||0),0)===0?'<span class="tag warn">評価配分は要確認</span>':'') + (ec?'<span class="tag warn">過去問 '+ec+'件</span>':'') +'</div>'
+  + '<div class="meta">'+(rc>=3&&a?('<span class="stars">'+stars(a)+'</span> 取りやすさ '+a.toFixed(1)+'（口コミ'+rc+'件）'):rc>0?('口コミ '+rc+'件（3件たまったら平均を表示します）'):'口コミはまだありません')+'</div>'
+  + '<button class="btn ghost small" data-cand="'+esc(c.id)+'">'+(candidates.includes(c.id)?'候補から外す':'履修候補に入れる')+'</button>'
   + '</article>';
 }
 function bindCourseCards(){
   $app.querySelectorAll("[data-course]").forEach(a=>a.onclick=e=>{ e.preventDefault(); selectedCourseName=a.dataset.course; selectedTeacherIdx=0; render(); window.scrollTo(0,0); });
+  $app.querySelectorAll("[data-cand]").forEach(b=>b.onclick=e=>{
+    e.preventDefault();
+    const id=b.dataset.cand;
+    if(candidates.includes(id)){ candidates=candidates.filter(x=>x!==id); toast("履修候補から外しました"); }
+    else { candidates.push(id); toast("履修候補に入れました（授業を探すページの上部で並べて見られます）"); }
+    save("bds_candidates", candidates);
+    b.textContent = candidates.includes(id) ? '候補から外す' : '履修候補に入れる';
+  });
 }
 
 /* ---------- courses list ---------- */
@@ -218,9 +228,14 @@ function renderCourses(){
   const perPage = 24, pages = Math.max(1, Math.ceil(filtered.length/perPage));
   if(coursePage>pages) coursePage=pages;
   const slice = filtered.slice((coursePage-1)*perPage, coursePage*perPage);
-  $app.innerHTML =
+  const candList = candidates.map(id=>COURSES.find(c=>c.id===id)).filter(Boolean);
+  const candHtml = candList.length ? '<section class="panel" style="border-top:4px solid var(--gold)"><h3>あなたの履修候補（'+candList.length+'件）</h3>'
+    + candList.map(c=>'<div style="font-size:14px;padding:3px 0"><a href="#" data-course="'+esc(c.name)+'">'+esc(c.name)+'</a> <span style="color:var(--mut);font-size:12.5px">'+esc(c.instructor)+' ／ '+esc(c.term)+' '+esc(c.schedule)+' ／ '+esc(c.credits)+'単位 ／ テスト'+(c.cats.test||0)+'%</span></div>').join("")
+    + '<p style="font-size:13.5px;margin:8px 0 0">合計 <strong>'+candList.reduce((s,c)=>s+(+c.credits||0),0)+'単位</strong> ／ テスト100%の授業 '+candList.filter(c=>(c.cats.test||0)>=100).length+'件 ／ 定期テストなし '+candList.filter(c=>c.noExam).length+'件</p>'
+    + '<p style="font-size:12px;color:var(--mut);margin:4px 0 0">候補は各授業カードの「履修候補に入れる」から追加・削除できます。時間割としての重なりチェックは今後の課題です。</p></section>' : '';
+  $app.innerHTML = candHtml +
   '<h2 class="sec" style="margin-top:2px">授業を探す</h2>'
-  + '<p class="sec-note">公式シラバス（2026年度・BDS学部専門教育科目 全'+COURSES.length+'クラス）から、評価の割合で探せます。「定期テスト100%だけ」「出席だけで決まる授業だけ」のような絞り込みができます。</p>'
+  + '<p class="sec-note">公式シラバス（2026年度・BDS学部専門教育科目 全'+COURSES.length+'クラス）から、評価の割合で探せます。「定期テスト100%だけ」「出席だけで決まる授業だけ」のような絞り込みができます。割合はシラバス原文からの自動解析のため誤差がある場合があります。必ず各授業の公式シラバス原文で確認してください。</p>'
   + '<div class="filters"><div class="row">'
   + '<div class="field" style="flex:1;min-width:220px"><label>キーワード（授業名・先生）</label><input type="text" id="fQ" value="'+esc(courseFilter.q)+'" placeholder="例: マーケティング、福井"></div>'
   + '<div class="field"><label>学期</label><select id="fTerm"><option value="">すべて</option>'+["春","秋"].map(t=>'<option '+(courseFilter.term===t?"selected":"")+'>'+t+'</option>').join("")+'</select></div>'
@@ -264,7 +279,8 @@ function renderCourseDetail(){
   + (entries.length>1 ? '<p style="font-size:13px;margin:10px 0 2px"><strong>先生を選ぶ</strong>（同じ授業でも先生で中身と評価が変わります）</p><div class="teachertabs">'+entries.map((e,i)=>'<button data-t="'+i+'" class="'+(i===selectedTeacherIdx?"on":"")+'">'+esc(e.instructor)+(e.cls?'（クラス'+esc(e.cls)+'）':'')+'</button>').join("")+'</div>' : '<p style="font-size:14px;margin-top:8px">担当: <strong>'+esc(c.instructor)+'</strong></p>')
   + gbar(c)
   + '<div class="tagrow">'+c.tags.map(t=>'<span class="tag">'+esc(t)+'</span>').join("")+(c.noExam?'<span class="tag ok">定期テストなし</span>':'')+'</div>'
-  + (avg ? '<div style="font-size:14px">みんなの評価: 取りやすさ <span class="stars">'+stars(avg.easy)+'</span> '+avg.easy.toFixed(1)+' ／ 充実度 <span class="stars">'+stars(avg.rich)+'</span> '+avg.rich.toFixed(1)+' ／ 課題の重さ <span class="stars">'+stars(avg.work)+'</span> '+avg.work.toFixed(1)+'（口コミ'+rs.length+'件）</div>' : '')
+  + (avg && rs.length>=3 ? '<div style="font-size:14px">みんなの評価: 取りやすさ <span class="stars">'+stars(avg.easy)+'</span> '+avg.easy.toFixed(1)+' ／ 充実度 <span class="stars">'+stars(avg.rich)+'</span> '+avg.rich.toFixed(1)+' ／ 課題の重さ <span class="stars">'+stars(avg.work)+'</span> '+avg.work.toFixed(1)+'（口コミ'+rs.length+'件）</div>' : (rs.length? '<div style="font-size:13px;color:var(--mut)">口コミ '+rs.length+'件（少人数の学部のため、3件たまるまでは平均点を表示しません）</div>' : ''))
+  + '<p style="font-size:12px;color:var(--mut);margin:6px 0 0">※成績評価の割合はシラバス原文からの自動解析です。誤差がある場合があるので、必ず公式シラバス原文で確認してください。</p>'
   + '</section>'
   + '<div class="cols"><div>'
   + '<section class="panel"><h3>シラバスの内容</h3><p style="font-size:14px;margin:0">'+esc(c.desc||"概要は公式シラバスで確認してください")+'</p>'
@@ -276,6 +292,7 @@ function renderCourseDetail(){
   + '<h3 style="margin-top:20px">口コミを書く</h3><div class="formgrid">'
   + '<div class="ratepick"><label>取りやすさ <select id="rEasy">'+[5,4,3,2,1].map(n=>'<option>'+n+'</option>').join("")+'</select></label><label>充実度 <select id="rRich">'+[5,4,3,2,1].map(n=>'<option>'+n+'</option>').join("")+'</select></label><label>課題の重さ <select id="rWork">'+[3,1,2,4,5].map(n=>'<option>'+n+'</option>').join("")+'</select></label><label>受講年度 <select id="rYear"><option>2026</option><option>2025</option></select></label></div>'
   + '<div class="field"><textarea id="rBody" rows="3" placeholder="例: テストは講義スライドから出る。出席は毎回取る。課題は重くないけど最終レポートが本気。"></textarea></div>'
+  + '<p class="note" style="font-size:12px;color:var(--mut);margin:0">投稿ルール: 授業の内容・進め方についての感想を書いてください。先生個人への批判、個人が特定される情報、事実でない内容は書かないでください。</p>'
   + '<button class="btn small" id="rSubmit">口コミを投稿する</button></div></section>'
   + '</div><div>'
   + '<section class="panel"><h3>過去問・過去課題</h3>'
@@ -285,7 +302,8 @@ function renderCourseDetail(){
   + '<div class="field"><label>年度</label><select id="eYear"><option>2026</option><option>2025</option></select></div>'
   + '<div class="field"><label>形式</label><select id="eKind"><option>期末テスト</option><option>中間テスト</option><option>小テスト</option><option>最終レポート</option><option>課題</option></select></div>'
   + '<div class="field"><label>内容・傾向メモ</label><textarea id="eNote" rows="2" placeholder="例: 計算問題3割、論述7割。スライドの図がそのまま出た。"></textarea></div>'
-  + '<div class="field"><label>ファイルのリンク（任意・Drive等のURL）</label><input id="eLink" type="url" placeholder="https://..."></div>'
+  + '<div class="field"><label>参考リンク（任意）</label><input id="eLink" type="url" placeholder="https://..."></div>'
+  + '<p class="note" style="font-size:12px;color:var(--mut);margin:0">試験問題そのものの転載は大学の規則・著作権に触れる場合があります。出題傾向や対策メモの共有を中心にしてください。</p>'
   + '<button class="btn small" id="eSubmit">過去問情報を追加</button></div></section>'
   + '<section class="panel"><h3>この授業のテスト・締切をカレンダーに</h3><p style="font-size:13px;color:var(--mut)">テスト日や課題締切が分かったら、みんなのカレンダーに追加できます。</p><button class="btn sub small" id="addCal">カレンダーに予定を追加</button></section>'
   + '</div></div>';
@@ -489,4 +507,4 @@ function renderBoard(){
 /* init */
 renderUserbox();
 render();
-if(!user) showGate();
+/* 閲覧は登録なしで自由に。学生登録は投稿するときだけ求める（入口の壁を作らない） */
