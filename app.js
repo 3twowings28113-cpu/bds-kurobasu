@@ -1,5 +1,5 @@
 "use strict";
-/* BDSクロバス - 関西大学BDS学部 学生専用情報共有アプリ */
+/* BDSクロバス v2 - 機能ごとにページ分岐（ハッシュルーティング） */
 const COURSES = (window.BDS_COURSES || []).concat(window.BDS_EXTRA_COURSES || []);
 const ZEMI = window.BDS_ZEMI || [];
 const $app = document.getElementById("app");
@@ -10,18 +10,18 @@ function save(key, v){ localStorage.setItem(key, JSON.stringify(v)); }
 function esc(s){ return String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
 function todayStr(){ const d=new Date(); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
 function toast(msg){ const t=document.createElement("div"); t.className="toast"; t.textContent=msg; document.body.appendChild(t); setTimeout(()=>t.remove(),2600); }
+function navTo(hash){ if(location.hash === hash){ route(); } else location.hash = hash; }
 
 let user = load("bds_user", null);
 let reviews = load("bds_reviews", {});
 let exams = load("bds_exams", {});
 let zemiPosts = load("bds_zemi_posts", {});
 let zemiInfo = load("bds_zemi_info", {});
-let events = load("bds_events", null);
-let books = load("bds_books", null);
+let events = load("bds_events", []);
+let books = load("bds_books", []);
 let board = load("bds_board", null);
 let candidates = load("bds_candidates", []);
-if(!events){ events = []; save("bds_events", events); }
-if(!books){ books = []; save("bds_books", books); }
+books.forEach(b=>{ b.type = b.type || "sell"; b.status = b.status || "open"; b.msgs = b.msgs || []; b.place = b.place || ""; b.when = b.when || ""; });
 if(!board){ board = [
   {id:"seed-b1", title:"BDSクロバスが始まりました", body:"1期生には先輩の口コミも過去問もない。だから自分たちで作ります。受けた授業の口コミ、ゼミの雰囲気、テスト日程、使い終わった教科書。次の学年のためにも、知っていることを少しずつ残していってください。", cat:"お知らせ", by:"運営", grade:"-", date:"2026-10-28"}
 ]; save("bds_board", board); }
@@ -30,10 +30,10 @@ if(!board){ board = [
 function renderUserbox(){
   const box = document.getElementById("userbox");
   if(user){
-    box.innerHTML = '<span class="chip">'+esc(user.grade)+'回生 '+esc(user.name)+'</span><button id="logoutBtn">登録を変更</button>';
+    box.innerHTML = '<span class="chip">'+esc(user.grade)+'回生 '+esc(user.name)+'</span><button id="logoutBtn" class="ubtn">登録を変更</button>';
     document.getElementById("logoutBtn").onclick = () => { if(confirm("登録情報を消して、最初の登録画面に戻りますか？（投稿した内容はこの端末に残ります）")){ localStorage.removeItem("bds_user"); user=null; renderUserbox(); showGate(); } };
   } else {
-    box.innerHTML = '<button id="loginBtn" style="background:#fff;color:var(--navy);border:0;border-radius:6px;padding:6px 14px;font-weight:700">学生登録</button>';
+    box.innerHTML = '<button id="loginBtn" class="ubtn solid">学生登録</button>';
     document.getElementById("loginBtn").onclick = showGate;
   }
 }
@@ -48,7 +48,7 @@ function showGate(){
   + '<div class="field"><label>学年</label><select id="gGrade"><option value="">選んでください</option><option>1</option><option>2</option><option>3</option><option>4</option></select></div>'
   + '<div class="field"><label>学部</label><select id="gFac"><option>ビジネスデータサイエンス学部</option><option>その他の学部（関大生）</option></select></div>'
   + '</div>'
-  + '<p class="note">※ 学籍番号はこの端末の中にだけ保存され、外部に送信されません。なりすまし防止のため、形式が合わない場合は登録できません。</p>'
+  + '<p class="note">※ 学籍番号は形式チェックだけに使い、保存も送信もしません。</p>'
   + '<button class="btn" id="gateSubmit" style="width:100%">登録してはじめる</button>'
   + (user ? '<button class="btn ghost" id="gateCancel" style="width:100%;margin-top:8px">キャンセル</button>' : '')
   + '</div></div>';
@@ -61,12 +61,12 @@ function showGate(){
     if(!name){ err.style.display="block"; err.textContent="名前を入力してください（ニックネームでOKです）"; return; }
     if(!/^k\d{6}$/.test(sid)){ err.style.display="block"; err.textContent="学籍番号の形式が違います。「k + 数字6桁」で入力してください。例: k924030"; return; }
     if(!grade){ err.style.display="block"; err.textContent="学年を選んでください"; return; }
-    user = { name, grade, fac }; /* 学籍番号は形式チェックだけに使い、保存しない */
+    user = { name, grade, fac };
     save("bds_user", user);
     $modal.innerHTML = "";
     renderUserbox();
     toast("登録しました。ようこそ、BDSクロバスへ");
-    render();
+    route();
   };
   const cancel = document.getElementById("gateCancel");
   if(cancel) cancel.onclick = () => { $modal.innerHTML=""; };
@@ -101,143 +101,136 @@ function avgStars(entry){
 }
 function stars(n){ const f = Math.round(n); return "★★★★★".slice(0,f) + "☆☆☆☆☆".slice(0,5-f); }
 
-/* ---------- navigation ---------- */
-let view = "home";
+/* ---------- router ---------- */
 let courseFilter = { q:"", preset:"", term:"", day:"", tag:"", minTest:"", sort:"name" };
-let selectedCourseName = null, selectedTeacherIdx = 0;
+let coursePage = 1;
+let selectedTeacherIdx = 0;
+let courseTab = "syllabus";
+let zemiTab = "about";
+let zemiFilter = { q:"", tag:"" };
+let bookFilter = "all";
+let openThreadId = null;
 let calCursor = (()=>{ const d=new Date(); return {y:d.getFullYear(), m:d.getMonth()}; })();
+let calPresetTitle = "";
 
-document.getElementById("mainnav").addEventListener("click", e => {
-  const b = e.target.closest("button[data-nav]"); if(!b) return;
-  view = b.dataset.nav; selectedCourseName = null;
-  document.querySelectorAll("#mainnav button").forEach(x=>x.classList.toggle("active", x===b));
-  render(); window.scrollTo(0,0);
-});
-document.querySelector(".brand").addEventListener("click", e => { e.preventDefault(); view="home"; selectedCourseName=null; render(); window.scrollTo(0,0); });
-
-function render(){
-  if(selectedCourseName){ renderCourseDetail(); return; }
-  if(view==="home") renderHome();
-  else if(view==="courses") renderCourses();
-  else if(view==="zemi") renderZemi();
-  else if(view==="calendar") renderCalendar();
-  else if(view==="books") renderBooks();
-  else if(view==="board") renderBoard();
+function parseHash(){
+  const raw = location.hash.replace(/^#\/?/, "");
+  if(!raw) return ["home"];
+  return raw.split("/").map(s=>{ try{ return decodeURIComponent(s); }catch(e){ return s; } });
 }
+function setNav(key){
+  document.querySelectorAll("[data-nav]").forEach(x=>x.classList.toggle("active", x.dataset.nav===key));
+}
+function route(){
+  const p = parseHash();
+  window.scrollTo(0,0);
+  if(p[0]==="courses"){ setNav("courses"); renderCourses(); }
+  else if(p[0]==="course" && p[1]){ setNav("courses"); renderCourseDetail(p[1], p[2]||courseTab); }
+  else if(p[0]==="zemi" && p[1]){ setNav("zemi"); renderZemiDetail(p[1], p[2]||zemiTab); }
+  else if(p[0]==="zemi"){ setNav("zemi"); renderZemi(); }
+  else if(p[0]==="calendar"){ setNav("calendar"); renderCalendar(); }
+  else if(p[0]==="books"){ setNav("books"); renderBooks(); }
+  else if(p[0]==="board"){ setNav("board"); renderBoard(); }
+  else if(p[0]==="mypage"){ setNav("mypage"); renderMypage(); }
+  else { setNav("home"); renderHome(); }
+}
+window.addEventListener("hashchange", route);
+document.querySelector(".brand").addEventListener("click", e => { e.preventDefault(); navTo("#/"); });
 
 /* ---------- home ---------- */
 function renderHome(){
   const totalReviews = Object.values(reviews).reduce((s,a)=>s+a.length,0);
   const totalExams = Object.values(exams).reduce((s,a)=>s+a.length,0);
-  const uniqNames = new Set(COURSES.map(c=>c.name)).size;
-  const test100 = COURSES.filter(c=>(c.cats.test||0)>=100);
-  const noExam = COURSES.filter(c=>c.noExam);
-  const upcoming = [...events].filter(e=>e.date>=todayStr()).sort((a,b)=>a.date<b.date?-1:1).slice(0,5);
+  const menu = [
+    ["#/courses","COURSES","授業を探す","テスト何割かで探せる。全授業の評価配分・口コミ・過去問。","wine"],
+    ["#/zemi","SEMINAR","ゼミ一覧","全16ゼミの研究分野・タグ・みんなの書き込み。説明会の日程も。","blue"],
+    ["#/calendar","CALENDAR","みんなのカレンダー","テスト日・ゼミ説明会・締切をみんなで追加。","green"],
+    ["#/books","TEXTBOOKS","教科書売買","売ります／買います、手渡し場所つき。連絡もここで。","wine"],
+    ["#/board","BOARD","掲示板","質問・情報共有。先輩のいない学部の、先輩代わり。","blue"],
+    ["#/mypage","MY LIST","履修候補リスト","気になる授業をためて、単位とテスト傾向を集計。","green"]
+  ];
   $app.innerHTML =
-  '<section class="hero"><h1>先輩のいない学部の、みんなの情報庫。</h1>'
-  + '<p>BDS学部はまだ1期生・2期生だけの新しい学部。どの授業がテスト何割か、どのゼミが自分に合いそうか、教科書は誰か譲ってくれないか。そういう情報が、ここに集まります。授業データは公式シラバス（2026年度）から。口コミと過去問は、みんなの投稿で育ちます。</p>'
-  + '<div class="searchbar"><input type="text" id="homeQ" placeholder="授業名・先生の名前で検索（例: 経営戦略論、因果推論、矢田）"><button class="btn" id="homeSearch">授業を探す</button></div>'
-  + '<div class="quickchips">'
-  + '<button class="qchip" data-preset="test100">定期テスト100%の授業</button>'
-  + '<button class="qchip" data-preset="noexam">定期テストなし</button>'
-  + '<button class="qchip" data-preset="attend">出席・平常だけで決まる</button>'
-  + '<button class="qchip" data-preset="report">レポート中心</button>'
-  + '<button class="qchip" data-preset="ondemand">集中・オンデマンド系</button>'
-  + '<button class="qchip" data-navto="zemi">ゼミを見てみる</button>'
+  '<section class="hero"><div class="hero-in">'
+  + '<p class="hero-en">KANSAI UNIVERSITY — BUSINESS DATA SCIENCE</p>'
+  + '<h1>先輩のいない学部の、<br>みんなの情報庫。</h1>'
+  + '<p class="hero-sub">どの授業がテスト何割か、どのゼミが自分に合いそうか、教科書は誰か譲ってくれないか。BDS学部の学生同士で、情報を分け合う場所です。</p>'
+  + '<div class="hero-search"><input type="text" id="homeQ" placeholder="授業名・先生の名前で検索（例: 経営戦略論、福井）"><button class="btn" id="homeSearch">授業を探す</button></div>'
+  + '<p class="hero-credit">トップ画像: 関西大学公式サイト（ビジネスデータサイエンス学部）／ 授業データは公式シラバス（2026年度）から</p>'
   + '</div></section>'
-  + '<div class="stats">'
-  + '<div class="stat"><b>'+uniqNames+'<small style="font-size:14px"> 科目</small></b><span>掲載中の授業（クラス違い含め'+COURSES.length+'件）</span></div>'
-  + '<div class="stat"><b>'+ZEMI.length+'<small style="font-size:14px"> ゼミ</small></b><span>ゼミ（教員）一覧</span></div>'
-  + '<div class="stat"><b>'+totalReviews+'<small style="font-size:14px"> 件</small></b><span>学生の口コミ投稿</span></div>'
-  + '<div class="stat"><b>'+totalExams+'<small style="font-size:14px"> 件</small></b><span>過去問・過去レポート情報</span></div>'
-  + '<div class="stat"><b>'+books.length+'<small style="font-size:14px"> 件</small></b><span>教科書の出品</span></div>'
-  + '</div>'
-  + '<h2 class="sec">近づいている予定</h2>'
-  + (upcoming.length ? upcoming.map(e=>'<div class="listrow"><div><strong>'+esc(e.date)+'</strong>　'+esc(e.title)+' <span class="tag">'+esc(e.type)+'</span><div class="meta" style="font-size:12.5px;color:var(--mut)">'+esc(e.detail||"")+'</div></div><button class="btn ghost small" data-navto="calendar">カレンダーで見る</button></div>').join("") : '<div class="empty">まだ予定が登録されていません。テストの日やゼミ説明会の日程を知っていたら、カレンダーから追加してください。</div>')
-  + '<h2 class="sec">定期テスト100%の授業</h2><p class="sec-note">シラバスの成績評価が定期試験100%の授業です。一発勝負になるので、過去問の有無が効いてきます。</p>'
-  + '<div class="grid">'+ test100.map(courseCard).join("") +'</div>'
-  + '<h2 class="sec">まずはここから</h2>'
-  + '<div class="grid">'
-  + '<div class="card"><h3>受けた授業の口コミを残す</h3><p class="desc">「テストは持ち込み可だった」「課題は毎週出る」みたいな一言が、次の学年の履修登録を救います。授業ページから、先生ごとに書き込めます。</p><button class="btn small" data-navto="courses">授業一覧へ</button></div>'
-  + '<div class="card"><h3>ゼミ選びで迷っている人へ</h3><p class="desc">ゼミ一覧では、先生の研究分野・タグ・先輩の書き込みをまとめています。説明会の日程やオンデマンドのリンクを知っていたら、ゼミページから追加してください。</p><button class="btn small" data-navto="zemi">ゼミ一覧へ</button></div>'
-  + '<div class="card"><h3>教科書、譲り合おう</h3><p class="desc">使い終わった教科書は、後輩が探しています。出品は無料。受け渡しは吹田みらいキャンパス内で。</p><button class="btn small" data-navto="books">教科書売買へ</button></div>'
-  + '</div>';
-  document.getElementById("homeSearch").onclick = () => { courseFilter = {q:document.getElementById("homeQ").value.trim(), preset:"", term:"", day:"", tag:"", minTest:"", sort:"name"}; view="courses"; setNav("courses"); render(); };
+  + '<section class="stats"><div><strong>'+COURSES.length+'</strong><span>授業クラス</span></div><div><strong>'+ZEMI.length+'</strong><span>ゼミ</span></div><div><strong>'+totalReviews+'</strong><span>口コミ</span></div><div><strong>'+totalExams+'</strong><span>過去問情報</span></div></section>'
+  + '<h2 class="sec"><span class="sec-en">MENU</span>何をしますか</h2>'
+  + '<div class="menugrid">'+ menu.map(([h,en,ja,d,cls])=>'<a class="menucard '+cls+'" href="'+h+'"><span class="mc-en">'+en+'</span><span class="mc-ja">'+ja+'</span><span class="mc-d">'+d+'</span><span class="mc-arrow">→</span></a>').join("") +'</div>'
+  + '<h2 class="sec"><span class="sec-en">HOW TO</span>はじめての方へ</h2>'
+  + '<div class="steps"><div class="step"><strong>1. 学生登録</strong><p>学籍番号（k+数字6桁）の形式チェックで、関大生だけが投稿できます。閲覧は登録なしでもOK。</p></div>'
+  + '<div class="step"><strong>2. 授業を探す</strong><p>「定期テスト100%」「定期テストなし」のような条件で絞り込めます。割合はシラバス原文の自動解析です。</p></div>'
+  + '<div class="step"><strong>3. 知っていることを残す</strong><p>受けた授業の口コミ、過去問の傾向、ゼミの雰囲気。あなたの1件が、次の学年の「先輩」になります。</p></div></div>';
+  document.getElementById("homeSearch").onclick = () => { courseFilter = {q:document.getElementById("homeQ").value.trim(), preset:"", term:"", day:"", tag:"", minTest:"", sort:"name"}; coursePage=1; navTo("#/courses"); };
   document.getElementById("homeQ").addEventListener("keydown", e=>{ if(e.key==="Enter") document.getElementById("homeSearch").click(); });
-  $app.querySelectorAll("[data-preset]").forEach(b=>b.onclick=()=>{ courseFilter={q:"",preset:b.dataset.preset,term:"",day:"",tag:"",minTest:"",sort:"name"}; view="courses"; setNav("courses"); render(); });
-  $app.querySelectorAll("[data-navto]").forEach(b=>b.onclick=()=>{ view=b.dataset.navto; setNav(view); render(); window.scrollTo(0,0); });
-  bindCourseCards();
-}
-function setNav(v){ document.querySelectorAll("#mainnav button").forEach(x=>x.classList.toggle("active", x.dataset.nav===v)); }
-
-function courseCard(c){
-  const a = avgStars(c);
-  const rc = courseReviews(c).length;
-  const ec = (exams[c.id]||[]).length;
-  return '<article class="card"><h3><a href="#" data-course="'+esc(c.name)+'">'+esc(c.name)+'</a></h3>'
-  + '<div class="meta">'+esc(c.instructor)+' ／ '+esc(c.term)+'学期 '+esc(c.schedule)+' ／ '+esc(c.credits)+'単位'+(c.cls?' ／ クラス'+esc(c.cls):'')+'</div>'
-  + gbar(c)
-  + '<div class="tagrow">'+ c.tags.map(t=>'<span class="tag">'+esc(t)+'</span>').join("") + ((c.noExam && (c.cats.test||0)===0)?'<span class="tag ok">定期テストなし</span>':'') + (GCATS.reduce((s,[k])=>s+(c.cats[k]||0),0)===0?'<span class="tag warn">評価配分は要確認</span>':'') + (ec?'<span class="tag warn">過去問 '+ec+'件</span>':'') +'</div>'
-  + '<div class="meta">'+(rc>=3&&a?('<span class="stars">'+stars(a)+'</span> 取りやすさ '+a.toFixed(1)+'（口コミ'+rc+'件）'):rc>0?('口コミ '+rc+'件（3件たまったら平均を表示します）'):'口コミはまだありません')+'</div>'
-  + '<button class="btn ghost small" data-cand="'+esc(c.id)+'">'+(candidates.includes(c.id)?'候補から外す':'履修候補に入れる')+'</button>'
-  + '</article>';
-}
-function bindCourseCards(){
-  $app.querySelectorAll("[data-course]").forEach(a=>a.onclick=e=>{ e.preventDefault(); selectedCourseName=a.dataset.course; selectedTeacherIdx=0; render(); window.scrollTo(0,0); });
-  $app.querySelectorAll("[data-cand]").forEach(b=>b.onclick=e=>{
-    e.preventDefault();
-    const id=b.dataset.cand;
-    if(candidates.includes(id)){ candidates=candidates.filter(x=>x!==id); toast("履修候補から外しました"); }
-    else { candidates.push(id); toast("履修候補に入れました（授業を探すページの上部で並べて見られます）"); }
-    save("bds_candidates", candidates);
-    b.textContent = candidates.includes(id) ? '候補から外す' : '履修候補に入れる';
-  });
 }
 
 /* ---------- courses list ---------- */
+function courseCard(c){
+  const rs = courseReviews(c);
+  const avg = avgStars(c);
+  const ex = (exams[c.id]||[]).length;
+  const inCand = candidates.includes(c.id);
+  return '<article class="card">'
+  + '<a class="card-main" href="#/course/'+encodeURIComponent(c.name)+'"><h3>'+esc(c.name)+'</h3></a>'
+  + '<p class="card-meta">'+esc(c.instructor)+' ／ '+esc(c.term||"")+' '+esc(c.schedule||"")+' ／ '+esc(c.credits||"")+'単位'+(rs.length? ' ／ 口コミ'+rs.length+'件':'')+(ex? ' ／ 過去問'+ex+'件':'')+'</p>'
+  + (avg!==null && rs.length>=3 ? '<p class="card-stars">'+stars(avg)+' 取りやすさ '+avg.toFixed(1)+'（'+rs.length+'件）</p>' : (rs.length? '<p class="card-stars dim">口コミ'+rs.length+'件（平均は3件から表示）</p>':''))
+  + gbar(c)
+  + '<p class="card-tags">'+(c.tags||[]).map(t=>'<span class="tag">'+esc(t)+'</span>').join("")+((c.noExam && (c.cats.test||0)===0)?'<span class="tag ok">定期テストなし</span>':'')+'</p>'
+  + '<button class="btn small '+(inCand?'ghost':'')+'" data-cand="'+esc(c.id)+'">'+(inCand?'履修候補から外す':'履修候補に入れる')+'</button>'
+  + '</article>';
+}
+function bindCourseCards(){
+  $app.querySelectorAll("[data-cand]").forEach(b=>b.onclick=e=>{
+    e.preventDefault();
+    const id = b.dataset.cand;
+    if(candidates.includes(id)){ candidates = candidates.filter(x=>x!==id); toast("履修候補から外しました"); }
+    else { if(!requireUser()) return; candidates.push(id); toast("履修候補に入れました（マイページで確認できます）"); }
+    save("bds_candidates", candidates);
+    route();
+  });
+}
 function applyFilter(list){
   const f = courseFilter;
   let out = list.filter(c=>{
-    if(f.q){ const q=f.q.toLowerCase(); if(!((c.name+" "+c.instructor+" "+(c.tags||[]).join(" ")).toLowerCase().includes(q))) return false; }
-    if(f.term && c.term!==f.term) return false;
-    if(f.day && !c.schedule.includes(f.day)) return false;
+    if(f.q){ const q=f.q.toLowerCase(); if(!(c.name.toLowerCase().includes(q)||(c.instructor||"").toLowerCase().includes(q))) return false; }
+    if(f.term && !(c.term||"").includes(f.term)) return false;
+    if(f.day && !(c.schedule||"").includes(f.day)) return false;
     if(f.tag && !(c.tags||[]).includes(f.tag)) return false;
     if(f.minTest!=="" && (c.cats.test||0) < +f.minTest) return false;
-    if(f.preset==="test100" && (c.cats.test||0)<100) return false;
-    if(f.preset==="noexam" && !c.noExam) return false;
-    if(f.preset==="attend" && !((c.cats.attend||0)>=50)) return false;
-    if(f.preset==="report" && !((c.cats.report||0)>=40)) return false;
-    if(f.preset==="ondemand" && !(c.schedule.includes("集中")||c.schedule.includes("他"))) return false;
+    if(f.preset==="test100" && (c.cats.test||0) < 100) return false;
+    if(f.preset==="noexam" && !((c.cats.test||0)===0)) return false;
+    if(f.preset==="attend" && (c.cats.attend||0) < 50) return false;
+    if(f.preset==="report" && (c.cats.report||0) < 40) return false;
+    if(f.preset==="ondemand" && !/集中|オンデマンド|その他/.test((c.schedule||"")+" "+(c.term||""))) return false;
     return true;
   });
-  const s=f.sort;
   out.sort((a,b)=>{
-    if(s==="testDesc") return (b.cats.test||0)-(a.cats.test||0);
-    if(s==="testAsc") return (a.cats.test||0)-(b.cats.test||0);
-    if(s==="attendDesc") return (b.cats.attend||0)-(a.cats.attend||0);
-    if(s==="easy"){ const x=avgStars(a), y=avgStars(b); return (y??-1)-(x??-1); }
-    if(s==="reviews") return courseReviews(b).length-courseReviews(a).length;
-    return a.name.localeCompare(b.name,"ja");
+    switch(f.sort){
+      case "testDesc": return (b.cats.test||0)-(a.cats.test||0);
+      case "testAsc": return (a.cats.test||0)-(b.cats.test||0);
+      case "attendDesc": return (b.cats.attend||0)-(a.cats.attend||0);
+      case "easy": { const x=avgStars(b), y=avgStars(a); return (x===null?-1:x)-(y===null?-1:y); }
+      case "reviews": return courseReviews(b).length-courseReviews(a).length;
+      default: return a.name.localeCompare(b.name,"ja");
+    }
   });
   return out;
 }
-let coursePage = 1;
 function renderCourses(){
   const tags = [...new Set(COURSES.flatMap(c=>c.tags||[]))];
   const filtered = applyFilter(COURSES);
   const perPage = 24, pages = Math.max(1, Math.ceil(filtered.length/perPage));
   if(coursePage>pages) coursePage=pages;
   const slice = filtered.slice((coursePage-1)*perPage, coursePage*perPage);
-  const candList = candidates.map(id=>COURSES.find(c=>c.id===id)).filter(Boolean);
-  const candHtml = candList.length ? '<section class="panel" style="border-top:4px solid var(--gold)"><h3>あなたの履修候補（'+candList.length+'件）</h3>'
-    + candList.map(c=>'<div style="font-size:14px;padding:3px 0"><a href="#" data-course="'+esc(c.name)+'">'+esc(c.name)+'</a> <span style="color:var(--mut);font-size:12.5px">'+esc(c.instructor)+' ／ '+esc(c.term)+' '+esc(c.schedule)+' ／ '+esc(c.credits)+'単位 ／ テスト'+(c.cats.test||0)+'%</span></div>').join("")
-    + '<p style="font-size:13.5px;margin:8px 0 0">合計 <strong>'+candList.reduce((s,c)=>s+(+c.credits||0),0)+'単位</strong> ／ テスト100%の授業 '+candList.filter(c=>(c.cats.test||0)>=100).length+'件 ／ 定期テストなし '+candList.filter(c=>c.noExam).length+'件</p>'
-    + '<p style="font-size:12px;color:var(--mut);margin:4px 0 0">候補は各授業カードの「履修候補に入れる」から追加・削除できます。時間割としての重なりチェックは今後の課題です。</p></section>' : '';
-  $app.innerHTML = candHtml +
-  '<h2 class="sec" style="margin-top:2px">授業を探す</h2>'
-  + '<p class="sec-note">公式シラバス（2026年度・BDS学部専門教育科目 全'+COURSES.length+'クラス）から、評価の割合で探せます。「定期テスト100%だけ」「出席だけで決まる授業だけ」のような絞り込みができます。割合はシラバス原文からの自動解析のため誤差がある場合があります。必ず各授業の公式シラバス原文で確認してください。</p>'
+  $app.innerHTML =
+  '<h2 class="sec"><span class="sec-en">COURSES</span>授業を探す</h2>'
+  + '<p class="sec-note">公式シラバス（2026年度・BDS学部専門教育科目 全'+COURSES.length+'クラス）から、評価の割合で探せます。割合はシラバス原文からの自動解析のため誤差がある場合があります。必ず各授業の公式シラバス原文で確認してください。</p>'
   + '<div class="filters"><div class="row">'
-  + '<div class="field" style="flex:1;min-width:220px"><label>キーワード（授業名・先生）</label><input type="text" id="fQ" value="'+esc(courseFilter.q)+'" placeholder="例: マーケティング、福井"></div>'
+  + '<div class="field" style="flex:1;min-width:200px"><label>キーワード（授業名・先生）</label><input type="text" id="fQ" value="'+esc(courseFilter.q)+'" placeholder="例: マーケティング、福井"></div>'
   + '<div class="field"><label>学期</label><select id="fTerm"><option value="">すべて</option>'+["春","秋"].map(t=>'<option '+(courseFilter.term===t?"selected":"")+'>'+t+'</option>').join("")+'</select></div>'
   + '<div class="field"><label>曜日</label><select id="fDay"><option value="">すべて</option>'+["月","火","水","木","金","土"].map(t=>'<option '+(courseFilter.day===t?"selected":"")+'>'+t+'</option>').join("")+'</select></div>'
   + '<div class="field"><label>分野</label><select id="fTag"><option value="">すべて</option>'+tags.map(t=>'<option '+(courseFilter.tag===t?"selected":"")+'>'+esc(t)+'</option>').join("")+'</select></div>'
@@ -250,261 +243,348 @@ function renderCourses(){
   + '</select>　<strong>'+filtered.length+'件</strong>見つかりました</div>'
   + (slice.length? '<div class="grid">'+slice.map(courseCard).join("")+'</div>' : '<div class="empty">条件に合う授業が見つかりませんでした。条件をゆるめてみてください。</div>')
   + (pages>1 ? '<div class="pager">'+Array.from({length:pages},(_,i)=>'<button data-page="'+(i+1)+'" class="'+(coursePage===i+1?"on":"")+'">'+(i+1)+'</button>').join("")+'</div>' : '');
-  const upd = () => { courseFilter.q=document.getElementById("fQ").value; courseFilter.term=document.getElementById("fTerm").value; courseFilter.day=document.getElementById("fDay").value; courseFilter.tag=document.getElementById("fTag").value; courseFilter.minTest=document.getElementById("fMinTest").value; courseFilter.sort=document.getElementById("fSort").value; coursePage=1; renderCourses(); bindCourseCards(); window.scrollTo(0,0); };
+  const upd = () => { courseFilter.q=document.getElementById("fQ").value; courseFilter.term=document.getElementById("fTerm").value; courseFilter.day=document.getElementById("fDay").value; courseFilter.tag=document.getElementById("fTag").value; courseFilter.minTest=document.getElementById("fMinTest").value; courseFilter.sort=document.getElementById("fSort").value; coursePage=1; renderCourses(); };
   ["fTerm","fDay","fTag","fSort"].forEach(id=>document.getElementById(id).onchange=upd);
   document.getElementById("fMinTest").onchange=upd;
   document.getElementById("fQ").addEventListener("keydown",e=>{ if(e.key==="Enter") upd(); });
-  $app.querySelectorAll("[data-p]").forEach(b=>b.onclick=()=>{ courseFilter.preset=b.dataset.p; coursePage=1; renderCourses(); bindCourseCards(); });
-  $app.querySelectorAll("[data-page]").forEach(b=>b.onclick=()=>{ coursePage=+b.dataset.page; renderCourses(); bindCourseCards(); window.scrollTo(0,0); });
+  $app.querySelectorAll("[data-p]").forEach(b=>b.onclick=()=>{ courseFilter.preset=b.dataset.p; coursePage=1; renderCourses(); });
+  $app.querySelectorAll("[data-page]").forEach(b=>b.onclick=()=>{ coursePage=+b.dataset.page; renderCourses(); window.scrollTo(0,0); });
   bindCourseCards();
 }
 
-/* ---------- course detail ---------- */
-function renderCourseDetail(){
-  const entries = COURSES.filter(c=>c.name===selectedCourseName);
-  if(!entries.length){ selectedCourseName=null; render(); return; }
-  if(selectedTeacherIdx>=entries.length) selectedTeacherIdx=0;
+/* ---------- course detail (tabs) ---------- */
+let lastCourseName = null;
+function renderCourseDetail(name, tab){
+  courseTab = ["syllabus","reviews","exams"].includes(tab) ? tab : "syllabus";
+  if(lastCourseName !== name){ selectedTeacherIdx = 0; lastCourseName = name; }
+  const entries = COURSES.filter(c=>c.name===name);
+  if(!entries.length){ $app.innerHTML = '<div class="empty">授業が見つかりませんでした。<a href="#/courses">授業一覧へ</a></div>'; return; }
+  if(selectedTeacherIdx >= entries.length) selectedTeacherIdx = 0;
   const c = entries[selectedTeacherIdx];
   const rs = courseReviews(c);
-  const es = exams[c.id]||[];
-  const avg = rs.length ? {
-    easy:(rs.reduce((s,r)=>s+ +r.easy,0)/rs.length),
-    rich:(rs.reduce((s,r)=>s+ +r.rich,0)/rs.length),
-    work:(rs.reduce((s,r)=>s+ +r.work,0)/rs.length)
-  } : null;
+  const ex = exams[c.id] || [];
+  const avg = avgStars(c);
+  const tabBtn = (k,label)=>'<button class="tabbtn '+(courseTab===k?"on":"")+'" data-ctab="'+k+'">'+label+'</button>';
+  let body = "";
+  if(courseTab==="syllabus"){
+    body = '<section class="panel"><h3>シラバス情報</h3>'
+    + '<div class="kv"><span>担当</span><p>'+esc(c.instructor)+'</p></div>'
+    + '<div class="kv"><span>学期・曜限</span><p>'+esc(c.term||"")+' '+esc(c.schedule||"")+' ／ '+esc(c.credits||"")+'単位'+(c.class? ' ／ クラス: '+esc(c.class):'')+'</p></div>'
+    + '<div class="kv"><span>評価配分</span><div>'+gbar(c)+'</div></div>'
+    + (c.gradingText? '<div class="kv"><span>評価方法（原文）</span><p class="pre">'+esc(c.gradingText)+'</p></div>':'')
+    + (c.desc? '<div class="kv"><span>授業概要</span><p class="pre">'+esc(c.desc)+'</p></div>':'')
+    + (c.textbook? '<div class="kv"><span>教科書</span><p class="pre">'+esc(c.textbook)+'</p></div>':'')
+    + '<div class="kv"><span>公式シラバス</span><p>'+(c.url? '<a href="'+esc(c.url)+'" target="_blank" rel="noopener">公式シラバスで原文を見る</a>' : '未取得')+'</p></div>'
+    + '<p class="note">割合はシラバス原文からの自動解析です。原文と違う場合は原文が正です。</p>'
+    + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px"><button class="btn small ghost" id="addCal">この授業のテスト日をカレンダーに登録</button>'
+    + '<button class="btn small '+(candidates.includes(c.id)?'ghost':'')+'" id="candBtn">'+(candidates.includes(c.id)?'履修候補から外す':'履修候補に入れる')+'</button></div>'
+    + '</section>';
+  }
+  if(courseTab==="reviews"){
+    body = '<section class="panel"><h3>口コミ（'+esc(c.instructor)+'先生）</h3>'
+    + (avg!==null && rs.length>=3 ? '<p class="card-stars">'+stars(avg)+' 取りやすさ平均 '+avg.toFixed(1)+'（'+rs.length+'件）</p>' : (rs.length? '<p class="note">口コミは'+rs.length+'件。平均点は3件たまると表示されます。</p>':''))
+    + (rs.length ? rs.map(r=>'<div class="post"><p class="post-head">'+stars(+r.easy||0)+' 取りやすさ ／ 充実度 '+esc(r.rich||"-")+' ／ 課題の重さ '+esc(r.heavy||"-")+' <span>'+esc(r.by||"")+' ・ '+esc(r.date||"")+'</span></p><p>'+esc(r.body||"")+'</p></div>').join("") : '<div class="empty">まだ口コミがありません。受けたことがある人は、最初の1件を書いてください。</div>')
+    + '<h4>口コミを書く</h4>'
+    + '<div class="formgrid">'
+    + '<div class="field"><label>取りやすさ（1〜5）</label><select id="rEasy"><option>5</option><option>4</option><option selected>3</option><option>2</option><option>1</option></select></div>'
+    + '<div class="field"><label>充実度（1〜5）</label><select id="rRich"><option>5</option><option>4</option><option selected>3</option><option>2</option><option>1</option></select></div>'
+    + '<div class="field"><label>課題の重さ（1=軽い〜5=重い）</label><select id="rHeavy"><option>1</option><option>2</option><option selected>3</option><option>4</option><option>5</option></select></div>'
+    + '<div class="field" style="grid-column:1/-1"><label>本文（任意）</label><textarea id="rBody" rows="3" placeholder="テストの傾向、出席の厳しさ、課題の量など、後輩が知りたいことを"></textarea></div>'
+    + '</div>'
+    + '<p class="note">先生個人への誹謗中傷ではなく、授業の事実を書いてください。不適切な投稿は運営が削除します。</p>'
+    + '<button class="btn" id="rSubmit">口コミを投稿</button></section>';
+  }
+  if(courseTab==="exams"){
+    body = '<section class="panel"><h3>過去問・出題傾向（'+esc(c.instructor)+'先生）</h3>'
+    + (ex.length ? ex.map(x=>'<div class="post"><p class="post-head">'+esc(x.year||"")+'年度 ／ '+esc(x.kind||"")+' <span>'+esc(x.by||"")+' ・ '+esc(x.date||"")+'</span></p><p>'+esc(x.memo||"")+'</p>'+(x.link? '<p><a href="'+esc(x.link)+'" target="_blank" rel="noopener">参考リンク</a></p>':'')+'</div>').join("") : '<div class="empty">まだ情報がありません。受けた人は出題の傾向だけでも残してください。</div>')
+    + '<h4>情報を追加</h4>'
+    + '<div class="formgrid">'
+    + '<div class="field"><label>年度</label><input id="eYear" type="text" placeholder="例: 2025"></div>'
+    + '<div class="field"><label>種類</label><select id="eKind"><option>定期試験</option><option>中間・小テスト</option><option>レポート課題</option><option>その他</option></select></div>'
+    + '<div class="field" style="grid-column:1/-1"><label>傾向メモ</label><textarea id="eMemo" rows="3" placeholder="例: 持ち込み可。授業スライドの図表から多く出題。計算問題中心で過去問と似た形式。"></textarea></div>'
+    + '<div class="field" style="grid-column:1/-1"><label>リンク（任意。公開リンクでないことを確認）</label><input id="eLink" type="url" placeholder="https://"></div>'
+    + '</div>'
+    + '<p class="note">試験問題そのものの転載は著作権に触れることがあります。まずは「出題傾向メモ」中心でお願いします。</p>'
+    + '<button class="btn" id="eSubmit">追加する</button></section>';
+  }
   $app.innerHTML =
-  '<button class="btn ghost small" id="backBtn">← 授業一覧に戻る</button>'
-  + '<section class="detail-head"><h1>'+esc(c.name)+'</h1>'
-  + '<div class="meta" style="color:var(--mut);font-size:13px">'+esc(c.term)+'学期 '+esc(c.schedule)+' ／ '+esc(c.credits)+'単位 ／ 時間割コード '+esc(c.id)+'</div>'
-  + (entries.length>1 ? '<p style="font-size:13px;margin:10px 0 2px"><strong>先生を選ぶ</strong>（同じ授業でも先生で中身と評価が変わります）</p><div class="teachertabs">'+entries.map((e,i)=>'<button data-t="'+i+'" class="'+(i===selectedTeacherIdx?"on":"")+'">'+esc(e.instructor)+(e.cls?'（クラス'+esc(e.cls)+'）':'')+'</button>').join("")+'</div>' : '<p style="font-size:14px;margin-top:8px">担当: <strong>'+esc(c.instructor)+'</strong></p>')
-  + gbar(c)
-  + '<div class="tagrow">'+c.tags.map(t=>'<span class="tag">'+esc(t)+'</span>').join("")+((c.noExam && (c.cats.test||0)===0)?'<span class="tag ok">定期テストなし</span>':'')+'</div>'
-  + (avg && rs.length>=3 ? '<div style="font-size:14px">みんなの評価: 取りやすさ <span class="stars">'+stars(avg.easy)+'</span> '+avg.easy.toFixed(1)+' ／ 充実度 <span class="stars">'+stars(avg.rich)+'</span> '+avg.rich.toFixed(1)+' ／ 課題の重さ <span class="stars">'+stars(avg.work)+'</span> '+avg.work.toFixed(1)+'（口コミ'+rs.length+'件）</div>' : (rs.length? '<div style="font-size:13px;color:var(--mut)">口コミ '+rs.length+'件（少人数の学部のため、3件たまるまでは平均点を表示しません）</div>' : ''))
-  + '<p style="font-size:12px;color:var(--mut);margin:6px 0 0">※成績評価の割合はシラバス原文からの自動解析です。誤差がある場合があるので、必ず公式シラバス原文で確認してください。</p>'
-  + '</section>'
-  + '<div class="cols"><div>'
-  + '<section class="panel"><h3>シラバスの内容</h3><p style="font-size:14px;margin:0">'+esc(c.desc||"概要は公式シラバスで確認してください")+'</p>'
-  + '<dl class="kv"><dt>成績評価（公式シラバス原文）</dt><dd>'+esc(c.grading)+'</dd>'
-  + (c.textbook ? '<dt>教科書</dt><dd>'+esc(c.textbook)+'</dd>' : '')
-  + '<dt>公式シラバス</dt><dd><a href="'+esc(c.url)+'" target="_blank" rel="noopener">関西大学シラバスでこの授業を見る</a></dd></dl></section>'
-  + '<section class="panel"><h3>口コミ（'+esc(c.instructor)+'先生）</h3>'
-  + (rs.length ? rs.map(r=>'<div class="review"><div class="rhead"><span>'+esc(r.grade)+'回生</span><span>'+esc(r.year)+'年度受講</span><span>取りやすさ <span class="stars">'+stars(+r.easy)+'</span></span><span>充実度 <span class="stars">'+stars(+r.rich)+'</span></span><span>課題 <span class="stars">'+stars(+r.work)+'</span></span></div><p>'+esc(r.body)+'</p></div>').join("") : '<div class="empty">この先生の口コミはまだありません。受けたことがある人は、最初の一件を残してください。</div>')
-  + '<h3 style="margin-top:20px">口コミを書く</h3><div class="formgrid">'
-  + '<div class="ratepick"><label>取りやすさ <select id="rEasy">'+[5,4,3,2,1].map(n=>'<option>'+n+'</option>').join("")+'</select></label><label>充実度 <select id="rRich">'+[5,4,3,2,1].map(n=>'<option>'+n+'</option>').join("")+'</select></label><label>課題の重さ <select id="rWork">'+[3,1,2,4,5].map(n=>'<option>'+n+'</option>').join("")+'</select></label><label>受講年度 <select id="rYear"><option>2026</option><option>2025</option></select></label></div>'
-  + '<div class="field"><textarea id="rBody" rows="3" placeholder="例: テストは講義スライドから出る。出席は毎回取る。課題は重くないけど最終レポートが本気。"></textarea></div>'
-  + '<p class="note" style="font-size:12px;color:var(--mut);margin:0">投稿ルール: 授業の内容・進め方についての感想を書いてください。先生個人への批判、個人が特定される情報、事実でない内容は書かないでください。</p>'
-  + '<button class="btn small" id="rSubmit">口コミを投稿する</button></div></section>'
-  + '</div><div>'
-  + '<section class="panel"><h3>過去問・過去課題</h3>'
-  + (es.length ? es.map(x=>'<div class="review"><div class="rhead"><span>'+esc(x.year)+'年度</span><span class="tag">'+esc(x.kind)+'</span></div><p><strong>'+esc(x.title)+'</strong><br>'+esc(x.note||"")+(x.link?' <br><a href="'+esc(x.link)+'" target="_blank" rel="noopener">ファイル・リンクを開く</a>':'')+'</p></div>').join("") : '<div class="empty">過去問情報はまだありません。持っている人は年度と形式だけでも共有してください（問題文そのものの転載ではなく、出題傾向の共有がおすすめです）。</div>')
-  + '<h3 style="margin-top:18px">追加する</h3><div class="formgrid">'
-  + '<div class="field"><label>タイトル</label><input id="eTitle" type="text" placeholder="例: 2025年度 期末テスト（出題傾向メモ）"></div>'
-  + '<div class="field"><label>年度</label><select id="eYear"><option>2026</option><option>2025</option></select></div>'
-  + '<div class="field"><label>形式</label><select id="eKind"><option>期末テスト</option><option>中間テスト</option><option>小テスト</option><option>最終レポート</option><option>課題</option></select></div>'
-  + '<div class="field"><label>内容・傾向メモ</label><textarea id="eNote" rows="2" placeholder="例: 計算問題3割、論述7割。スライドの図がそのまま出た。"></textarea></div>'
-  + '<div class="field"><label>参考リンク（任意）</label><input id="eLink" type="url" placeholder="https://..."></div>'
-  + '<p class="note" style="font-size:12px;color:var(--mut);margin:0">試験問題そのものの転載は大学の規則・著作権に触れる場合があります。出題傾向や対策メモの共有を中心にしてください。</p>'
-  + '<button class="btn small" id="eSubmit">過去問情報を追加</button></div></section>'
-  + '<section class="panel"><h3>この授業のテスト・締切をカレンダーに</h3><p style="font-size:13px;color:var(--mut)">テスト日や課題締切が分かったら、みんなのカレンダーに追加できます。</p><button class="btn sub small" id="addCal">カレンダーに予定を追加</button></section>'
-  + '</div></div>';
-  document.getElementById("backBtn").onclick=()=>{ selectedCourseName=null; view="courses"; render(); };
-  $app.querySelectorAll("[data-t]").forEach(b=>b.onclick=()=>{ selectedTeacherIdx=+b.dataset.t; renderCourseDetail(); window.scrollTo(0,0); });
-  document.getElementById("rSubmit").onclick=()=>{
-    if(!requireUser()) return;
-    const body=document.getElementById("rBody").value.trim();
-    if(!body){ toast("口コミの本文を書いてください"); return; }
-    (reviews[c.id] = reviews[c.id]||[]).unshift({ grade:user.grade, year:document.getElementById("rYear").value, easy:document.getElementById("rEasy").value, rich:document.getElementById("rRich").value, work:document.getElementById("rWork").value, body, date:todayStr() });
-    save("bds_reviews", reviews); toast("口コミを投稿しました"); renderCourseDetail();
-  };
-  document.getElementById("eSubmit").onclick=()=>{
-    if(!requireUser()) return;
-    const title=document.getElementById("eTitle").value.trim();
-    if(!title){ toast("タイトルを入力してください"); return; }
-    (exams[c.id] = exams[c.id]||[]).unshift({ year:document.getElementById("eYear").value, kind:document.getElementById("eKind").value, title, note:document.getElementById("eNote").value.trim(), link:document.getElementById("eLink").value.trim(), date:todayStr() });
-    save("bds_exams", exams); toast("過去問情報を追加しました"); renderCourseDetail();
-  };
-  document.getElementById("addCal").onclick=()=>{ view="calendar"; setNav("calendar"); renderCalendar(true, c.name); window.scrollTo(0,0); };
+  '<p class="crumb"><a href="#/courses">← 授業一覧に戻る</a></p>'
+  + '<h2 class="detail-title">'+esc(name)+'</h2>'
+  + (entries.length>1 ? '<div class="teachertabs">'+entries.map((e,i)=>'<button class="'+(i===selectedTeacherIdx?"on":"")+'" data-t="'+i+'">'+esc(e.instructor)+'先生</button>').join("")+'</div>' : '<p class="sec-note">担当: '+esc(c.instructor)+'先生 ／ '+esc(c.term||"")+' '+esc(c.schedule||"")+' ／ '+esc(c.credits||"")+'単位</p>')
+  + '<div class="tabbar">'+tabBtn("syllabus","概要・成績") + tabBtn("reviews","口コミ（"+rs.length+"）") + tabBtn("exams","過去問（"+ex.length+"）")+'</div>'
+  + body;
+  $app.querySelectorAll("[data-t]").forEach(b=>b.onclick=()=>{ selectedTeacherIdx=+b.dataset.t; renderCourseDetail(name, courseTab); });
+  $app.querySelectorAll("[data-ctab]").forEach(b=>b.onclick=()=>{ navTo("#/course/"+encodeURIComponent(name)+"/"+b.dataset.ctab); });
+  if(courseTab==="syllabus"){
+    document.getElementById("addCal").onclick=()=>{ calPresetTitle = name; navTo("#/calendar"); };
+    document.getElementById("candBtn").onclick=()=>{
+      if(candidates.includes(c.id)){ candidates = candidates.filter(x=>x!==c.id); toast("履修候補から外しました"); }
+      else { if(!requireUser()) return; candidates.push(c.id); toast("履修候補に入れました"); }
+      save("bds_candidates", candidates); renderCourseDetail(name, courseTab);
+    };
+  }
+  if(courseTab==="reviews"){
+    document.getElementById("rSubmit").onclick=()=>{
+      if(!requireUser()) return;
+      (reviews[c.id] = reviews[c.id] || []).unshift({ easy:document.getElementById("rEasy").value, rich:document.getElementById("rRich").value, heavy:document.getElementById("rHeavy").value, body:document.getElementById("rBody").value.trim(), by:user.name+"（"+user.grade+"回生）", date:todayStr() });
+      save("bds_reviews", reviews); toast("口コミを投稿しました"); renderCourseDetail(name, "reviews");
+    };
+  }
+  if(courseTab==="exams"){
+    document.getElementById("eSubmit").onclick=()=>{
+      if(!requireUser()) return;
+      const memo = document.getElementById("eMemo").value.trim();
+      if(!memo){ toast("傾向メモを書いてください"); return; }
+      (exams[c.id] = exams[c.id] || []).unshift({ year:document.getElementById("eYear").value.trim(), kind:document.getElementById("eKind").value, memo, link:document.getElementById("eLink").value.trim(), by:user.name+"（"+user.grade+"回生）", date:todayStr() });
+      save("bds_exams", exams); toast("過去問情報を追加しました"); renderCourseDetail(name, "exams");
+    };
+  }
 }
 
 /* ---------- zemi ---------- */
-let zemiFilter = { q:"", tag:"" };
 function renderZemi(){
-  const allTags = [...new Set(ZEMI.flatMap(z=>z.tags))];
+  const tags = [...new Set(ZEMI.flatMap(z=>z.tags||[]))];
   const list = ZEMI.filter(z=>{
-    if(zemiFilter.q && !((z.teacher+z.field+z.intro+z.tags.join(" ")).includes(zemiFilter.q))) return false;
-    if(zemiFilter.tag && !z.tags.includes(zemiFilter.tag)) return false;
+    if(zemiFilter.q){ const q=zemiFilter.q.toLowerCase(); if(!(z.teacher.toLowerCase().includes(q)||(z.field||"").toLowerCase().includes(q)||(z.intro||"").toLowerCase().includes(q))) return false; }
+    if(zemiFilter.tag && !(z.tags||[]).includes(zemiFilter.tag)) return false;
     return true;
   });
   $app.innerHTML =
-  '<h2 class="sec" style="margin-top:2px">ゼミ一覧</h2>'
-  + '<p class="sec-note">BDS学部のゼミ（専門演習）担当教員の一覧です。研究分野は学部パンフレット・公式シラバスをもとにしています。<strong>説明会の日程とオンデマンド動画は学内限定で公開されるため、確認した人が各ゼミのページから追加できるようにしています。</strong>分かったらぜひ書き込んでください。</p>'
-  + '<div class="filters"><div class="row"><div class="field" style="flex:1;min-width:220px"><label>キーワード（先生・分野）</label><input type="text" id="zQ" value="'+esc(zemiFilter.q)+'" placeholder="例: マーケティング、機械学習、会計"></div>'
-  + '<div class="field"><label>タグ</label><select id="zTag"><option value="">すべて</option>'+allTags.map(t=>'<option '+(zemiFilter.tag===t?"selected":"")+'>'+esc(t)+'</option>').join("")+'</select></div></div></div>'
+  '<h2 class="sec"><span class="sec-en">SEMINAR</span>ゼミ一覧</h2>'
+  + '<p class="sec-note">BDS学部のゼミ（専門演習）'+ZEMI.length+'件。研究分野は学部パンフレット2026から。説明会の日程・オンデマンド動画は分かった人が各ゼミのページで追加できます。</p>'
+  + '<div class="filters"><div class="row">'
+  + '<div class="field" style="flex:1;min-width:200px"><label>キーワード（先生・研究分野）</label><input type="text" id="zQ" value="'+esc(zemiFilter.q)+'" placeholder="例: 機械学習、マーケティング"></div>'
+  + '<div class="field"><label>タグ</label><select id="zTag"><option value="">すべて</option>'+tags.map(t=>'<option '+(zemiFilter.tag===t?"selected":"")+'>'+esc(t)+'</option>').join("")+'</select></div>'
+  + '</div></div>'
   + '<div class="grid">'+ list.map(z=>{
-      const info = zemiInfo[z.id]||{};
-      const briefing = info.briefing ?? z.briefing, ondemand = info.ondemand ?? z.ondemand;
-      const ps = zemiPosts[z.id]||[];
-      return '<article class="card"><h3>'+esc(z.teacher)+' ゼミ</h3><div class="meta">'+esc(z.title)+' ／ '+esc(z.field)+'</div>'
-      + '<p class="desc">'+esc(z.intro)+'</p>'
-      + '<div class="tagrow">'+z.tags.map(t=>'<span class="tag">'+esc(t)+'</span>').join("")+'</div>'
-      + '<div class="meta">説明会: '+(briefing? '<strong>'+esc(briefing)+'</strong>' : '<span style="color:var(--red)">情報募集中</span>')+'<br>オンデマンド: '+(ondemand? '<a href="'+esc(ondemand)+'" target="_blank" rel="noopener">動画を見る</a>' : '<span style="color:var(--red)">情報募集中</span>')+'<br>先輩・同期の書き込み: '+ps.length+'件</div>'
-      + '<button class="btn small" data-zemi="'+z.id+'">ゼミの詳細・書き込み</button></article>';
+      const info = zemiInfo[z.id] || {};
+      const brief = info.briefing || z.briefing || "";
+      const posts = (zemiPosts[z.id]||[]).length;
+      return '<article class="card"><a class="card-main" href="#/zemi/'+esc(z.id)+'"><h3>'+esc(z.teacher)+' ゼミ</h3></a>'
+      + '<p class="card-meta">'+esc(z.title||"")+' ／ '+esc(z.field||"")+(posts? ' ／ 書き込み'+posts+'件':'')+'</p>'
+      + '<p class="card-d">'+esc(z.intro||"")+'</p>'
+      + '<p class="card-tags">'+(z.tags||[]).map(t=>'<span class="tag">'+esc(t)+'</span>').join("")+'</p>'
+      + '<p class="card-meta">'+(brief? '説明会: '+esc(brief) : '説明会: <span class="dim">情報募集中</span>')+'</p></article>';
     }).join("") +'</div>';
   document.getElementById("zTag").onchange=e=>{ zemiFilter.tag=e.target.value; renderZemi(); };
   document.getElementById("zQ").addEventListener("keydown",e=>{ if(e.key==="Enter"){ zemiFilter.q=e.target.value; renderZemi(); } });
-  $app.querySelectorAll("[data-zemi]").forEach(b=>b.onclick=()=>renderZemiDetail(b.dataset.zemi));
 }
-function renderZemiDetail(id){
-  const z = ZEMI.find(x=>x.id===id); if(!z) return;
-  const info = zemiInfo[id]||{};
-  const briefing = info.briefing ?? z.briefing, ondemand = info.ondemand ?? z.ondemand;
-  const ps = zemiPosts[id]||[];
+function renderZemiDetail(id, tab){
+  zemiTab = ["about","posts","info"].includes(tab) ? tab : "about";
+  const z = ZEMI.find(x=>x.id===id);
+  if(!z){ $app.innerHTML = '<div class="empty">ゼミが見つかりませんでした。<a href="#/zemi">ゼミ一覧へ</a></div>'; return; }
+  const info = zemiInfo[id] || {};
+  const brief = info.briefing ?? z.briefing ?? "";
+  const ond = info.ondemand ?? z.ondemand ?? "";
+  const posts = zemiPosts[id] || [];
+  const tabBtn = (k,label)=>'<button class="tabbtn '+(zemiTab===k?"on":"")+'" data-ztab="'+k+'">'+label+'</button>';
+  let body = "";
+  if(zemiTab==="about"){
+    body = '<section class="panel"><h3>ゼミ情報</h3>'
+    + '<div class="kv"><span>担当</span><p>'+esc(z.teacher)+'（'+esc(z.title||"")+'）</p></div>'
+    + '<div class="kv"><span>研究分野</span><p>'+esc(z.field||"")+'</p></div>'
+    + '<div class="kv"><span>タグ</span><p>'+(z.tags||[]).map(t=>'<span class="tag">'+esc(t)+'</span>').join(" ")+'</p></div>'
+    + '<div class="kv"><span>紹介</span><p class="pre">'+esc(z.intro||"")+'</p></div>'
+    + '<div class="kv"><span>説明会</span><p>'+(brief? esc(brief) : '<span class="dim">情報募集中（「説明会・動画」タブから追加できます）</span>')+'</p></div>'
+    + '<div class="kv"><span>オンデマンド</span><p>'+(ond? '<a href="'+esc(ond)+'" target="_blank" rel="noopener">'+esc(ond)+'</a>' : '<span class="dim">情報募集中</span>')+'</p></div>'
+    + '</section>';
+  }
+  if(zemiTab==="posts"){
+    body = '<section class="panel"><h3>みんなの書き込み（'+posts.length+'件）</h3>'
+    + (posts.length ? posts.map(p=>'<div class="post"><p class="post-head">'+esc(p.cat||"情報")+' <span>'+esc(p.by||"")+' ・ '+esc(p.date||"")+'</span></p><p>'+esc(p.body||"")+'</p></div>').join("") : '<div class="empty">まだ書き込みがありません。ゼミの雰囲気・選考・活動頻度など、知っていることを書いてください。</div>')
+    + '<h4>書き込む</h4><div class="formgrid">'
+    + '<div class="field"><label>種類</label><select id="zpCat"><option>ゼミの雰囲気</option><option>選考・応募</option><option>活動内容</option><option>その他</option></select></div>'
+    + '<div class="field" style="grid-column:1/-1"><label>本文</label><textarea id="zpBody" rows="3" placeholder="例: 週1回、発表とディスカッション中心。先生は現場経験の話が多め。"></textarea></div></div>'
+    + '<button class="btn" id="zpSubmit">投稿する</button></section>';
+  }
+  if(zemiTab==="info"){
+    body = '<section class="panel"><h3>説明会・オンデマンド情報</h3>'
+    + '<p class="note">正式な日程は学内LMS限定のため、ここは学生が知っている情報を出し合う場所です。分かった人が上書きしてください。</p>'
+    + '<div class="formgrid">'
+    + '<div class="field" style="grid-column:1/-1"><label>説明会の日程・場所</label><input id="ziBrief" type="text" value="'+esc(brief)+'" placeholder="例: 11/12(水) 5限、教室棟301（対面）"></div>'
+    + '<div class="field" style="grid-column:1/-1"><label>オンデマンド動画のURL</label><input id="ziOnd" type="url" value="'+esc(ond)+'" placeholder="https://"></div>'
+    + '</div><button class="btn" id="ziSubmit">保存する</button></section>';
+  }
   $app.innerHTML =
-  '<button class="btn ghost small" id="zBack">← ゼミ一覧に戻る</button>'
-  + '<section class="detail-head"><h1>'+esc(z.teacher)+' ゼミ</h1><div style="color:var(--mut);font-size:13px">'+esc(z.title)+' ／ 研究分野: '+esc(z.field)+'</div>'
-  + '<div class="tagrow">'+z.tags.map(t=>'<span class="tag">'+esc(t)+'</span>').join("")+'</div>'
-  + '<p style="font-size:14.5px">'+esc(z.intro)+'</p></section>'
-  + '<div class="cols"><div><section class="panel"><h3>みんなの書き込み・口コミ</h3>'
-  + (ps.length ? ps.map(p=>'<div class="review"><div class="rhead"><span>'+esc(p.grade)+'回生</span><span class="tag">'+esc(p.kind)+'</span><span>'+esc(p.date)+'</span></div><p>'+esc(p.body)+'</p></div>').join("") : '<div class="empty">まだ書き込みがありません。説明会に行った感想、面談の雰囲気、活動頻度、大会・企業連携の有無など、知っていることを残してください。</div>')
-  + '<h3 style="margin-top:20px">書き込む</h3><div class="formgrid">'
-  + '<div class="field"><label>種類</label><select id="zpKind"><option>説明会の感想</option><option>ゼミの雰囲気</option><option>活動内容</option><option>選考・面談</option><option>その他情報</option></select></div>'
-  + '<div class="field"><textarea id="zpBody" rows="3" placeholder="例: 説明会では先輩の発表が中心。週1コマ＋隔週で企業訪問。雰囲気は和やかだけど発表準備はしっかりめ。"></textarea></div>'
-  + '<button class="btn small" id="zpSubmit">書き込む</button></div></section></div>'
-  + '<div><section class="panel"><h3>説明会・オンデマンド</h3><dl class="kv">'
-  + '<dt>説明会の日程</dt><dd>'+(briefing? esc(briefing) : '<span style="color:var(--red)">情報募集中</span>')+'</dd>'
-  + '<dt>オンデマンド動画</dt><dd>'+(ondemand? '<a href="'+esc(ondemand)+'" target="_blank" rel="noopener">'+esc(ondemand)+'</a>' : '<span style="color:var(--red)">情報募集中</span>')+'</dd></dl>'
-  + '<h3 style="margin-top:16px">情報を追加・更新する</h3><div class="formgrid">'
-  + '<div class="field"><label>説明会の日程</label><input id="ziBriefing" type="text" value="'+esc(briefing)+'" placeholder="例: 11月12日(木) 4限・吹田みらいキャンパス"></div>'
-  + '<div class="field"><label>オンデマンド動画のURL</label><input id="ziOndemand" type="url" value="'+esc(ondemand)+'" placeholder="https://... (LMS/Panopto等)"></div>'
-  + '<button class="btn small" id="ziSubmit">保存する</button></div>'
-  + '<p style="font-size:12px;color:var(--mut)">保存すると、このゼミを見た全員（この端末では自分の表示）に反映されます。正式な全体公開データへの反映は運営が確認後に行います。</p></section>'
-  + '<section class="panel"><h3>この先生の授業</h3>'
-  + COURSES.filter(c=>c.instructor.includes(z.teacher.replace(/\s/g,""))||c.instructor.includes(z.teacher.split(" ")[0])).slice(0,6).map(c=>'<div style="font-size:14px;padding:4px 0"><a href="#" data-course="'+esc(c.name)+'">'+esc(c.name)+'</a> <span style="color:var(--mut);font-size:12px">'+esc(c.term)+' '+esc(c.schedule)+'</span></div>').join("")
-  + '</section></div></div>';
-  document.getElementById("zBack").onclick=()=>renderZemi();
-  bindCourseCards();
-  document.getElementById("zpSubmit").onclick=()=>{
-    if(!requireUser()) return;
-    const body=document.getElementById("zpBody").value.trim(); if(!body){ toast("本文を書いてください"); return; }
-    (zemiPosts[id]=zemiPosts[id]||[]).unshift({ grade:user.grade, kind:document.getElementById("zpKind").value, body, date:todayStr() });
-    save("bds_zemi_posts", zemiPosts); toast("書き込みました"); renderZemiDetail(id);
-  };
-  document.getElementById("ziSubmit").onclick=()=>{
-    if(!requireUser()) return;
-    zemiInfo[id]={ briefing:document.getElementById("ziBriefing").value.trim(), ondemand:document.getElementById("ziOndemand").value.trim() };
-    save("bds_zemi_info", zemiInfo); toast("ゼミ情報を保存しました"); renderZemiDetail(id);
-  };
+  '<p class="crumb"><a href="#/zemi">← ゼミ一覧に戻る</a></p>'
+  + '<h2 class="detail-title">'+esc(z.teacher)+' ゼミ</h2>'
+  + '<p class="sec-note">'+esc(z.title||"")+' ／ '+esc(z.field||"")+'</p>'
+  + '<div class="tabbar">'+tabBtn("about","ゼミ情報")+tabBtn("posts","書き込み（"+posts.length+"）")+tabBtn("info","説明会・動画")+'</div>'
+  + body;
+  $app.querySelectorAll("[data-ztab]").forEach(b=>b.onclick=()=>{ navTo("#/zemi/"+id+"/"+b.dataset.ztab); });
+  if(zemiTab==="posts"){
+    document.getElementById("zpSubmit").onclick=()=>{
+      if(!requireUser()) return;
+      const body = document.getElementById("zpBody").value.trim();
+      if(!body){ toast("本文を書いてください"); return; }
+      (zemiPosts[id] = zemiPosts[id] || []).unshift({ cat:document.getElementById("zpCat").value, body, by:user.name+"（"+user.grade+"回生）", date:todayStr() });
+      save("bds_zemi_posts", zemiPosts); toast("投稿しました"); renderZemiDetail(id, "posts");
+    };
+  }
+  if(zemiTab==="info"){
+    document.getElementById("ziSubmit").onclick=()=>{
+      if(!requireUser()) return;
+      zemiInfo[id] = { briefing:document.getElementById("ziBrief").value.trim(), ondemand:document.getElementById("ziOnd").value.trim(), by:user.name, date:todayStr() };
+      save("bds_zemi_info", zemiInfo); toast("保存しました"); renderZemiDetail(id, "about");
+    };
+  }
 }
 
 /* ---------- calendar ---------- */
-function renderCalendar(focusAdd, presetTitle){
+function renderCalendar(){
   const {y, m} = calCursor;
   const first = new Date(y, m, 1);
   const startDay = first.getDay();
-  const daysInMonth = new Date(y, m+1, 0).getDate();
-  const daysInPrev = new Date(y, m, 0).getDate();
-  const monthStr = y+"-"+String(m+1).padStart(2,"0");
-  const evByDay = {};
-  for(const e of events){ if(e.date.startsWith(monthStr)){ const d=+e.date.slice(8,10); (evByDay[d]=evByDay[d]||[]).push(e); } }
-  let cells = ["日","月","火","水","木","金","土"].map(d=>'<div class="dow">'+d+'</div>').join("");
-  for(let i=0;i<42;i++){
-    const dayNum = i - startDay + 1;
-    let disp, dim=false, key=null;
-    if(dayNum<1){ disp=daysInPrev+dayNum; dim=true; }
-    else if(dayNum>daysInMonth){ disp=dayNum-daysInMonth; dim=true; }
-    else { disp=dayNum; key=dayNum; }
-    const isToday = !dim && (monthStr+"-"+String(disp).padStart(2,"0"))===todayStr();
-    cells += '<div class="calcell'+(dim?" dim":"")+(isToday?" today":"")+'"><strong>'+disp+'</strong>'
-      + (key && evByDay[key] ? evByDay[key].map(e=>'<span class="ev '+(e.type==="テスト"?"test":e.type.includes("ゼミ")?"zemi":e.type==="締切"?"deadline":"")+'" data-ev="'+e.id+'">'+esc(e.title)+'</span>').join("") : '')
-      + '</div>';
-    if(i>=34 && dayNum>=daysInMonth) break;
+  const days = new Date(y, m+1, 0).getDate();
+  const today = todayStr();
+  const byDay = {};
+  events.forEach(ev=>{ (byDay[ev.date] = byDay[ev.date] || []).push(ev); });
+  let cells = "";
+  for(let i=0;i<startDay;i++) cells += '<div class="cal-cell blank"></div>';
+  for(let d=1; d<=days; d++){
+    const ds = y+"-"+String(m+1).padStart(2,"0")+"-"+String(d).padStart(2,"0");
+    const evs = byDay[ds] || [];
+    cells += '<div class="cal-cell'+(ds===today?" today":"")+'"><span class="cal-d">'+d+'</span>'+evs.map(ev=>'<span class="cal-ev '+esc(ev.type||"その他")+'">'+esc(ev.title)+'</span>').join("")+'</div>';
   }
-  const monthEvents = [...events].filter(e=>e.date.startsWith(monthStr)).sort((a,b)=>a.date<b.date?-1:1);
+  const upcoming = events.filter(ev=>ev.date>=today).sort((a,b)=>a.date<b.date?-1:1).slice(0,10);
   $app.innerHTML =
-  '<h2 class="sec" style="margin-top:2px">みんなのカレンダー</h2>'
-  + '<p class="sec-note">テスト日・課題締切・ゼミ説明会など、知った人が追加していくカレンダーです。自分の予定ではなく、みんなに関係する日程を入れてください。</p>'
-  + '<div class="cols"><div class="calwrap"><div class="calhead"><button class="btn ghost small" id="calPrev">← 前の月</button><b>'+y+'年 '+(m+1)+'月</b><button class="btn ghost small" id="calNext">次の月 →</button></div>'
-  + '<div class="calgrid">'+cells+'</div></div>'
-  + '<div><section class="panel"><h3>この月の予定</h3>'
-  + (monthEvents.length ? monthEvents.map(e=>'<div class="review"><div class="rhead"><span>'+esc(e.date)+'</span><span class="tag">'+esc(e.type)+'</span><span>投稿: '+esc(e.by||"")+'</span></div><p><strong>'+esc(e.title)+'</strong>'+(e.detail?'<br>'+esc(e.detail):'')+'</p></div>').join("") : '<div class="empty">この月の予定はまだありません。</div>')
+  '<h2 class="sec"><span class="sec-en">CALENDAR</span>みんなのカレンダー</h2>'
+  + '<p class="sec-note">テスト日、ゼミ説明会、レポート締切など、みんなで追加していくカレンダーです。</p>'
+  + '<div class="cal-head"><button class="btn small ghost" id="calPrev">← 前の月</button><h3>'+y+'年'+(m+1)+'月</h3><button class="btn small ghost" id="calNext">次の月 →</button></div>'
+  + '<div class="cal-grid"><div class="cal-w">日</div><div class="cal-w">月</div><div class="cal-w">火</div><div class="cal-w">水</div><div class="cal-w">木</div><div class="cal-w">金</div><div class="cal-w">土</div>'+cells+'</div>'
+  + '<section class="panel"><h3>これからの予定</h3>'
+  + (upcoming.length ? upcoming.map(ev=>'<div class="listrow"><div><strong>'+esc(ev.title)+'</strong><div class="card-meta">'+esc(ev.date)+' ／ '+esc(ev.type||"")+(ev.memo? ' ／ '+esc(ev.memo):'')+'</div></div><span class="tag">'+esc(ev.type||"その他")+'</span></div>').join("") : '<div class="empty">登録されている予定はありません。</div>')
   + '</section>'
-  + '<section class="panel" id="addPanel"><h3>予定を追加する</h3><div class="formgrid">'
-  + '<div class="field"><label>日付</label><input id="evDate" type="date" value="'+todayStr()+'"></div>'
-  + '<div class="field"><label>種類</label><select id="evType"><option>テスト</option><option>ゼミ説明会</option><option>締切</option><option>授業・行事</option><option>その他</option></select></div>'
-  + '<div class="field"><label>タイトル</label><input id="evTitle" type="text" value="'+esc(presetTitle? presetTitle+" テスト":"")+'" placeholder="例: 経営戦略論 期末テスト"></div>'
-  + '<div class="field"><label>詳細（任意）</label><textarea id="evDetail" rows="2" placeholder="例: 持ち込み不可。教室は通常と異なるので注意。"></textarea></div>'
-  + '<button class="btn small" id="evSubmit">カレンダーに追加</button></div></section></div></div>';
+  + '<section class="panel"><h3>予定を追加</h3><div class="formgrid">'
+  + '<div class="field"><label>日付</label><input id="evDate" type="date" value="'+today+'"></div>'
+  + '<div class="field"><label>種類</label><select id="evType"><option>テスト</option><option>レポート締切</option><option>ゼミ説明会</option><option>授業</option><option>イベント</option><option>その他</option></select></div>'
+  + '<div class="field" style="grid-column:1/-1"><label>タイトル</label><input id="evTitle" type="text" value="'+esc(calPresetTitle)+'" placeholder="例: 経営戦略論 中間テスト"></div>'
+  + '<div class="field" style="grid-column:1/-1"><label>メモ（任意）</label><input id="evMemo" type="text" placeholder="例: 持ち込み可、教室棟201"></div>'
+  + '</div><button class="btn" id="evSubmit">カレンダーに追加</button></section>';
+  calPresetTitle = "";
   document.getElementById("calPrev").onclick=()=>{ calCursor = m===0? {y:y-1,m:11}:{y,m:m-1}; renderCalendar(); };
   document.getElementById("calNext").onclick=()=>{ calCursor = m===11? {y:y+1,m:0}:{y,m:m+1}; renderCalendar(); };
   document.getElementById("evSubmit").onclick=()=>{
     if(!requireUser()) return;
-    const date=document.getElementById("evDate").value, title=document.getElementById("evTitle").value.trim();
-    if(!date||!title){ toast("日付とタイトルを入力してください"); return; }
-    events.push({ id:"ev"+Date.now(), date, title, type:document.getElementById("evType").value, detail:document.getElementById("evDetail").value.trim(), by:user.name });
-    save("bds_events", events);
-    calCursor = { y:+date.slice(0,4), m:+date.slice(5,7)-1 };
-    toast("予定を追加しました"); renderCalendar();
+    const title = document.getElementById("evTitle").value.trim();
+    const date = document.getElementById("evDate").value;
+    if(!title || !date){ toast("日付とタイトルを入れてください"); return; }
+    events.push({ id:"ev"+Date.now(), title, date, type:document.getElementById("evType").value, memo:document.getElementById("evMemo").value.trim(), by:user.name });
+    save("bds_events", events); toast("カレンダーに追加しました"); renderCalendar();
   };
-  if(focusAdd){ const p=document.getElementById("addPanel"); if(p) p.scrollIntoView({behavior:"smooth"}); }
 }
 
-/* ---------- textbooks ---------- */
+/* ---------- books ---------- */
+const PLACES = ["吹田みらいキャンパス 正門前","吹田みらいキャンパス 学食・カフェ前","吹田みらいキャンパス 図書館前","吹田みらいキャンパス 教室棟前","JR岸辺駅","阪急正雀駅","応相談"];
+function bookStatusLabel(s){ return s==="talk" ? "交渉中" : s==="done" ? "取引完了" : "募集中"; }
 function renderBooks(){
+  const list = books.filter(b=> bookFilter==="all" || b.type===bookFilter).slice().sort((a,b)=>(b.createdAt||0)-(a.createdAt||0));
   $app.innerHTML =
-  '<h2 class="sec" style="margin-top:2px">教科書売買</h2>'
-  + '<p class="sec-note">使い終わった教科書を、必要としている後輩へ。受け渡しは吹田みらいキャンパス内で行うのがおすすめです。連絡先は、学内のTeamsやLINEなど、相手が学生だと分かる方法にしてください。</p>'
-  + '<div class="filters"><div class="row"><div class="field" style="flex:1;min-width:220px"><label>教科書名・授業名で探す</label><input type="text" id="bQ" placeholder="例: 統計、マーケティング"></div><button class="btn" id="bSearch">探す</button></div></div>'
+  '<h2 class="sec"><span class="sec-en">TEXTBOOKS</span>教科書売買</h2>'
+  + '<p class="sec-note">使い終わった教科書を売る／ほしい教科書を探す場所です。手渡しは学内が基本。連絡は各投稿の「連絡する」から（この端末内デモでは投稿に紐づくスレッドに残ります）。個人情報の公開には注意してください。</p>'
+  + '<div class="quickchips" style="margin-bottom:14px">'+[["all","すべて"],["sell","売ります"],["buy","買います"]].map(([k,l])=>'<button class="qchip '+(bookFilter===k?"on":"")+'" data-bf="'+k+'">'+l+'</button>').join("")+'</div>'
+  + '<section class="panel"><h3>投稿する</h3><div class="formgrid">'
+  + '<div class="field"><label>種類</label><select id="bkType"><option value="sell">売ります（出品）</option><option value="buy">買います（募集）</option></select></div>'
+  + '<div class="field"><label>価格（買いますの場合は希望価格）</label><input id="bkPrice" type="number" min="0" placeholder="例: 1500"></div>'
+  + '<div class="field" style="grid-column:1/-1"><label>教科書名</label><input id="bkTitle" type="text" placeholder="例: ミクロ経済学入門 第3版"></div>'
+  + '<div class="field"><label>関連する授業（任意）</label><input id="bkCourse" type="text" placeholder="例: ミクロ経済学"></div>'
+  + '<div class="field"><label>状態（売りますの場合）</label><select id="bkCond"><option>新品同様</option><option>書き込みなし</option><option>書き込みあり</option><option>傷みあり</option><option>指定なし（買います）</option></select></div>'
+  + '<div class="field"><label>手渡し場所</label><select id="bkPlace">'+PLACES.map(p=>'<option>'+p+'</option>').join("")+'</select></div>'
+  + '<div class="field"><label>希望日時</label><input id="bkWhen" type="text" placeholder="例: 平日昼休み、来週中など"></div>'
+  + '<div class="field" style="grid-column:1/-1"><label>メモ（任意）</label><input id="bkNote" type="text" placeholder="例: 第2版でも可、急ぎません"></div>'
+  + '<div class="field" style="grid-column:1/-1"><label>連絡先（任意。LINE IDなど。公開されるので注意）</label><input id="bkContact" type="text" placeholder="空欄なら下の連絡スレッドでやり取り"></div>'
+  + '</div><button class="btn" id="bkSubmit">投稿する</button></section>'
   + '<div id="bookList">'
-  + (books.length ? books.map(bk=>'<div class="listrow"><div><strong>'+esc(bk.title)+'</strong> <span class="tag">'+esc(bk.course||"授業名なし")+'</span><div style="font-size:13px;color:var(--mut)">状態: '+esc(bk.cond)+' ／ 出品: '+esc(bk.grade)+'回生 '+esc(bk.by)+' ／ '+esc(bk.date)+'<br>'+esc(bk.note||"")+'<br>連絡先: '+esc(bk.contact)+'</div></div><div class="price">¥'+Number(bk.price||0).toLocaleString()+'</div></div>').join("") : '<div class="empty">まだ出品がありません。最初の出品者になってください。</div>')
-  + '</div>'
-  + '<section class="panel" style="margin-top:18px"><h3>教科書を出品する</h3><div class="formgrid">'
-  + '<div class="field"><label>教科書名</label><input id="bkTitle" type="text" placeholder="例: 基礎から学ぶ統計学"></div>'
-  + '<div class="field"><label>使う授業</label><input id="bkCourse" type="text" placeholder="例: 統計基礎" list="courseNames"><datalist id="courseNames">'+[...new Set(COURSES.map(c=>c.name))].map(n=>'<option value="'+esc(n)+'">').join("")+'</datalist></div>'
-  + '<div class="field"><label>価格（円）</label><input id="bkPrice" type="number" min="0" step="100" placeholder="1500"></div>'
-  + '<div class="field"><label>状態</label><select id="bkCond"><option>新品同様</option><option>きれい（書き込みなし）</option><option>書き込みあり</option><option>使用感あり</option></select></div>'
-  + '<div class="field"><label>連絡先</label><input id="bkContact" type="text" placeholder="例: Teamsで「山下」まで / LINE知ってる人はLINEで"></div>'
-  + '<div class="field"><label>ひとこと</label><textarea id="bkNote" rows="2" placeholder="例: 昨年度使用。テスト対策のメモ付きです。"></textarea></div>'
-  + '<button class="btn small" id="bkSubmit">出品する</button></div></section>';
-  const doSearch=()=>{
-    const q=document.getElementById("bQ").value.trim();
-    const list = q? books.filter(bk=>(bk.title+bk.course).includes(q)) : books;
-    document.getElementById("bookList").innerHTML = list.length? "" : '<div class="empty">見つかりませんでした。</div>';
-    if(list.length) renderBooksFiltered(list);
+  + (list.length ? list.map(bk=>{
+      const mine = user && bk.by === user.name;
+      const msgs = bk.msgs || [];
+      return '<article class="bookcard">'
+      + '<div class="book-main"><div><span class="tag '+(bk.type==="buy"?"buy":"sell")+'">'+(bk.type==="buy"?"買います":"売ります")+'</span> <strong>'+esc(bk.title)+'</strong> <span class="tag st-'+esc(bk.status||"open")+'">'+bookStatusLabel(bk.status||"open")+'</span>'
+      + '<div class="card-meta">'+(bk.course? '授業: '+esc(bk.course)+' ／ ':'')+'状態: '+esc(bk.cond||"-")+'<br>手渡し: '+esc(bk.place||"応相談")+(bk.when? ' ／ 希望: '+esc(bk.when):'')+(bk.note? '<br>'+esc(bk.note):'')+(bk.contact? '<br>連絡先: '+esc(bk.contact):'')+'<br><span class="dim">'+esc(bk.by||"")+'（'+esc(bk.grade||"")+'回生） ・ '+esc(bk.date||"")+'</span></div></div>'
+      + '<div class="price">¥'+Number(bk.price||0).toLocaleString()+'</div></div>'
+      + '<div class="book-actions"><button class="btn small ghost" data-thread="'+esc(bk.id)+'">連絡する（'+msgs.length+'）</button>'
+      + (mine && bk.status!=="done" ? '<button class="btn small ghost" data-st="'+esc(bk.id)+'">状態を変更（'+(bk.status==="open"?"交渉中にする":"取引完了にする")+'）</button>' : '')
+      + '</div>'
+      + (openThreadId===bk.id ? '<div class="thread">'
+        + (msgs.length ? msgs.map(mm=>'<div class="post"><p class="post-head">'+esc(mm.name)+' <span>'+esc(mm.at||"")+'</span></p><p>'+esc(mm.text)+'</p></div>').join("") : '<p class="note">まだ連絡はありません。手渡しの日時・場所の相談をここに書いてください。</p>')
+        + '<div class="thread-form"><input id="thText" type="text" placeholder="例: はじめまして。購入したいです。明日昼休みに正門前でどうですか？"><button class="btn small" id="thSend">送信</button></div>'
+        + '<p class="note">※ 現在はこの端末内だけのデモ表示です。全員で共有できる連絡機能はバックエンド化後の提供です。</p></div>' : '')
+      + '</article>';
+    }).join("") : '<div class="empty">まだ投稿がありません。最初の1件をどうぞ。</div>')
+  + '</div>';
+  $app.querySelectorAll("[data-bf]").forEach(b=>b.onclick=()=>{ bookFilter=b.dataset.bf; renderBooks(); });
+  $app.querySelectorAll("[data-thread]").forEach(b=>b.onclick=()=>{ openThreadId = openThreadId===b.dataset.thread ? null : b.dataset.thread; renderBooks(); });
+  $app.querySelectorAll("[data-st]").forEach(b=>b.onclick=()=>{
+    const bk = books.find(x=>x.id===b.dataset.st); if(!bk) return;
+    bk.status = bk.status==="open" ? "talk" : "done";
+    save("bds_books", books); toast("状態を「"+bookStatusLabel(bk.status)+"」にしました"); renderBooks();
+  });
+  const thSend = document.getElementById("thSend");
+  if(thSend) thSend.onclick=()=>{
+    if(!requireUser()) return;
+    const text = document.getElementById("thText").value.trim();
+    if(!text){ toast("メッセージを書いてください"); return; }
+    const bk = books.find(x=>x.id===openThreadId); if(!bk) return;
+    bk.msgs = bk.msgs || [];
+    bk.msgs.push({ name:user.name+"（"+user.grade+"回生）", text, at:todayStr() });
+    save("bds_books", books); toast("連絡を書きました"); renderBooks();
   };
-  function renderBooksFiltered(list){ document.getElementById("bookList").innerHTML = list.map(bk=>'<div class="listrow"><div><strong>'+esc(bk.title)+'</strong> <span class="tag">'+esc(bk.course||"")+'</span><div style="font-size:13px;color:var(--mut)">状態: '+esc(bk.cond)+' ／ '+esc(bk.date)+'<br>'+esc(bk.note||"")+'<br>連絡先: '+esc(bk.contact)+'</div></div><div class="price">¥'+Number(bk.price||0).toLocaleString()+'</div></div>').join(""); }
-  document.getElementById("bSearch").onclick=doSearch;
   document.getElementById("bkSubmit").onclick=()=>{
     if(!requireUser()) return;
-    const title=document.getElementById("bkTitle").value.trim();
-    const price=document.getElementById("bkPrice").value;
-    const contact=document.getElementById("bkContact").value.trim();
-    if(!title||price===""||!contact){ toast("教科書名・価格・連絡先を入力してください"); return; }
-    books.unshift({ id:"bk"+Date.now(), title, course:document.getElementById("bkCourse").value.trim(), price:+price, cond:document.getElementById("bkCond").value, contact, note:document.getElementById("bkNote").value.trim(), by:user.name, grade:user.grade, date:todayStr() });
-    save("bds_books", books); toast("出品しました"); renderBooks();
+    const title = document.getElementById("bkTitle").value.trim();
+    if(!title){ toast("教科書名を入れてください"); return; }
+    books.unshift({ id:"bk"+Date.now(), type:document.getElementById("bkType").value, title,
+      price:+document.getElementById("bkPrice").value || 0,
+      course:document.getElementById("bkCourse").value.trim(),
+      cond:document.getElementById("bkCond").value,
+      place:document.getElementById("bkPlace").value,
+      when:document.getElementById("bkWhen").value.trim(),
+      note:document.getElementById("bkNote").value.trim(),
+      contact:document.getElementById("bkContact").value.trim(),
+      by:user.name, grade:user.grade, date:todayStr(), status:"open", msgs:[], createdAt:Date.now() });
+    save("bds_books", books); toast("投稿しました"); bookFilter="all"; renderBooks();
   };
 }
 
 /* ---------- board ---------- */
 function renderBoard(){
   $app.innerHTML =
-  '<h2 class="sec" style="margin-top:2px">掲示板・情報共有</h2>'
-  + '<p class="sec-note">授業・ゼミ・学部生活の情報共有に使ってください。個人名や連絡先など、個人が特定される情報は書かないでください。</p>'
-  + board.map(p=>'<article class="card" style="margin-bottom:12px"><div class="meta"><span class="tag">'+esc(p.cat)+'</span> '+esc(p.date)+' ／ '+esc(p.grade==='-'?"":p.grade+"回生 ")+esc(p.by)+'</div><h3>'+esc(p.title)+'</h3><p style="margin:0;font-size:14.5px">'+esc(p.body)+'</p></article>').join("")
+  '<h2 class="sec"><span class="sec-en">BOARD</span>掲示板</h2>'
+  + '<p class="sec-note">質問・情報共有の場所です。「この先生の課題どう？」「ゼミ迷ってる」など、先輩のいない学部で先輩代わりになる場所を目指します。</p>'
   + '<section class="panel"><h3>投稿する</h3><div class="formgrid">'
-  + '<div class="field"><label>種類</label><select id="bdCat"><option>情報共有</option><option>質問</option><option>お知らせ</option><option>雑談</option></select></div>'
-  + '<div class="field"><label>タイトル</label><input id="bdTitle" type="text" placeholder="例: ゼミ説明会の日程まとめ"></div>'
-  + '<div class="field"><label>本文</label><textarea id="bdBody" rows="4"></textarea></div>'
-  + '<button class="btn small" id="bdSubmit">投稿する</button></div></section>';
+  + '<div class="field"><label>カテゴリ</label><select id="bdCat"><option>質問</option><option>情報共有</option><option>雑談</option><option>お知らせ</option></select></div>'
+  + '<div class="field"><label>タイトル</label><input id="bdTitle" type="text" placeholder="例: 統計学の課題、どこまでやりましたか"></div>'
+  + '<div class="field" style="grid-column:1/-1"><label>本文</label><textarea id="bdBody" rows="3"></textarea></div>'
+  + '</div><button class="btn" id="bdSubmit">投稿する</button></section>'
+  + board.map(p=>'<article class="panel post-card"><p class="post-head"><span class="tag">'+esc(p.cat||"")+'</span> <strong>'+esc(p.title)+'</strong> <span>'+esc(p.by||"")+' ・ '+esc(p.date||"")+'</span></p><p class="pre">'+esc(p.body||"")+'</p></article>').join("");
   document.getElementById("bdSubmit").onclick=()=>{
     if(!requireUser()) return;
-    const title=document.getElementById("bdTitle").value.trim(), body=document.getElementById("bdBody").value.trim();
-    if(!title||!body){ toast("タイトルと本文を入力してください"); return; }
-    board.unshift({ id:"bd"+Date.now(), title, body, cat:document.getElementById("bdCat").value, by:user.name, grade:user.grade, date:todayStr() });
+    const title = document.getElementById("bdTitle").value.trim();
+    const body = document.getElementById("bdBody").value.trim();
+    if(!title || !body){ toast("タイトルと本文を書いてください"); return; }
+    board.unshift({ id:"bd"+Date.now(), cat:document.getElementById("bdCat").value, title, body, by:user.name+"（"+user.grade+"回生）", date:todayStr() });
     save("bds_board", board); toast("投稿しました"); renderBoard();
   };
 }
 
-/* init */
+/* ---------- mypage (candidates) ---------- */
+function renderMypage(){
+  const list = candidates.map(id=>COURSES.find(c=>c.id===id)).filter(Boolean);
+  $app.innerHTML =
+  '<h2 class="sec"><span class="sec-en">MY LIST</span>履修候補リスト</h2>'
+  + '<p class="sec-note">授業ページで「履修候補に入れる」を押した授業がここにたまります。単位とテスト傾向の目安にどうぞ。</p>'
+  + (list.length ? '<section class="panel">'
+    + list.map(c=>'<div class="listrow"><div><a href="#/course/'+encodeURIComponent(c.name)+'"><strong>'+esc(c.name)+'</strong></a><div class="card-meta">'+esc(c.instructor)+' ／ '+esc(c.term||"")+' '+esc(c.schedule||"")+' ／ '+esc(c.credits||"")+'単位 ／ テスト'+(c.cats.test||0)+'%</div></div><button class="btn small ghost" data-rm="'+esc(c.id)+'">外す</button></div>').join("")
+    + '<p style="margin-top:10px">合計 <strong>'+list.reduce((s,c)=>s+(+c.credits||0),0)+'単位</strong> ／ テスト100%の授業 '+list.filter(c=>(c.cats.test||0)>=100).length+'件 ／ 定期テストなし '+list.filter(c=>(c.cats.test||0)===0).length+'件</p>'
+    + '<p class="note">時間割としての重なりチェックは今後の課題です。</p></section>'
+    : '<div class="empty">まだ候補がありません。<a href="#/courses">授業を探す</a>から気になる授業を入れてください。</div>');
+  $app.querySelectorAll("[data-rm]").forEach(b=>b.onclick=()=>{ candidates = candidates.filter(x=>x!==b.dataset.rm); save("bds_candidates", candidates); renderMypage(); });
+}
+
+/* ---------- init ---------- */
+document.querySelectorAll("[data-nav]").forEach(b=>{
+  if(b.classList.contains("brand")) return;
+  b.addEventListener("click", ()=>{ navTo(b.dataset.nav==="home" ? "#/" : "#/"+b.dataset.nav); });
+});
 renderUserbox();
-render();
-/* 閲覧は登録なしで自由に。学生登録は投稿するときだけ求める（入口の壁を作らない） */
+route();
