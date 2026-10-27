@@ -44,7 +44,7 @@ function showGate(){
   + '<div class="err" id="gateErr"></div>'
   + '<div class="formgrid">'
   + '<div class="field"><label>名前（ニックネームでもOK。本名でなくて大丈夫です）</label><input id="gName" type="text" placeholder="例: つばさ" autocomplete="off"></div>'
-  + '<div class="field"><label>学籍番号（k + 数字6桁。例: k924030）</label><input id="gSid" type="text" placeholder="k000000" autocomplete="off"></div>'
+  + '<div class="field"><label>学籍番号（k + 数字6桁。例: k924030）</label><input id="gSid" type="text" placeholder="ここに学籍番号を入力" autocomplete="off"></div>'
   + '<div class="field"><label>学年</label><select id="gGrade"><option value="">選んでください</option><option>1</option><option>2</option><option>3</option><option>4</option></select></div>'
   + '<div class="field"><label>学部</label><select id="gFac"><option>ビジネスデータサイエンス学部</option><option>その他の学部（関大生）</option></select></div>'
   + '</div>'
@@ -89,7 +89,7 @@ function gbar(c){
   let bar = '<div class="gbar">', leg = '<div class="glegend">';
   for(const [k,label,cls] of GCATS){
     const v = c.cats[k]||0; if(!v) continue;
-    bar += '<i class="'+cls+'" style="width:'+v+'%"></i>';
+    bar += '<i class="'+cls+'" style="width:'+(v/total*100)+'%"></i>';
     leg += '<span><i class="'+cls+'"></i>'+label+' '+v+'%</span>';
   }
   return bar+'</div>'+leg+'</div>';
@@ -177,7 +177,7 @@ function courseCard(c){
   return '<article class="card"><h3><a href="#" data-course="'+esc(c.name)+'">'+esc(c.name)+'</a></h3>'
   + '<div class="meta">'+esc(c.instructor)+' ／ '+esc(c.term)+'学期 '+esc(c.schedule)+' ／ '+esc(c.credits)+'単位'+(c.cls?' ／ クラス'+esc(c.cls):'')+'</div>'
   + gbar(c)
-  + '<div class="tagrow">'+ c.tags.map(t=>'<span class="tag">'+esc(t)+'</span>').join("") + (c.noExam?'<span class="tag ok">定期テストなし</span>':'') + (GCATS.reduce((s,[k])=>s+(c.cats[k]||0),0)===0?'<span class="tag warn">評価配分は要確認</span>':'') + (ec?'<span class="tag warn">過去問 '+ec+'件</span>':'') +'</div>'
+  + '<div class="tagrow">'+ c.tags.map(t=>'<span class="tag">'+esc(t)+'</span>').join("") + ((c.noExam && (c.cats.test||0)===0)?'<span class="tag ok">定期テストなし</span>':'') + (GCATS.reduce((s,[k])=>s+(c.cats[k]||0),0)===0?'<span class="tag warn">評価配分は要確認</span>':'') + (ec?'<span class="tag warn">過去問 '+ec+'件</span>':'') +'</div>'
   + '<div class="meta">'+(rc>=3&&a?('<span class="stars">'+stars(a)+'</span> 取りやすさ '+a.toFixed(1)+'（口コミ'+rc+'件）'):rc>0?('口コミ '+rc+'件（3件たまったら平均を表示します）'):'口コミはまだありません')+'</div>'
   + '<button class="btn ghost small" data-cand="'+esc(c.id)+'">'+(candidates.includes(c.id)?'候補から外す':'履修候補に入れる')+'</button>'
   + '</article>';
@@ -278,7 +278,7 @@ function renderCourseDetail(){
   + '<div class="meta" style="color:var(--mut);font-size:13px">'+esc(c.term)+'学期 '+esc(c.schedule)+' ／ '+esc(c.credits)+'単位 ／ 時間割コード '+esc(c.id)+'</div>'
   + (entries.length>1 ? '<p style="font-size:13px;margin:10px 0 2px"><strong>先生を選ぶ</strong>（同じ授業でも先生で中身と評価が変わります）</p><div class="teachertabs">'+entries.map((e,i)=>'<button data-t="'+i+'" class="'+(i===selectedTeacherIdx?"on":"")+'">'+esc(e.instructor)+(e.cls?'（クラス'+esc(e.cls)+'）':'')+'</button>').join("")+'</div>' : '<p style="font-size:14px;margin-top:8px">担当: <strong>'+esc(c.instructor)+'</strong></p>')
   + gbar(c)
-  + '<div class="tagrow">'+c.tags.map(t=>'<span class="tag">'+esc(t)+'</span>').join("")+(c.noExam?'<span class="tag ok">定期テストなし</span>':'')+'</div>'
+  + '<div class="tagrow">'+c.tags.map(t=>'<span class="tag">'+esc(t)+'</span>').join("")+((c.noExam && (c.cats.test||0)===0)?'<span class="tag ok">定期テストなし</span>':'')+'</div>'
   + (avg && rs.length>=3 ? '<div style="font-size:14px">みんなの評価: 取りやすさ <span class="stars">'+stars(avg.easy)+'</span> '+avg.easy.toFixed(1)+' ／ 充実度 <span class="stars">'+stars(avg.rich)+'</span> '+avg.rich.toFixed(1)+' ／ 課題の重さ <span class="stars">'+stars(avg.work)+'</span> '+avg.work.toFixed(1)+'（口コミ'+rs.length+'件）</div>' : (rs.length? '<div style="font-size:13px;color:var(--mut)">口コミ '+rs.length+'件（少人数の学部のため、3件たまるまでは平均点を表示しません）</div>' : ''))
   + '<p style="font-size:12px;color:var(--mut);margin:6px 0 0">※成績評価の割合はシラバス原文からの自動解析です。誤差がある場合があるので、必ず公式シラバス原文で確認してください。</p>'
   + '</section>'
