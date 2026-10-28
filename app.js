@@ -371,6 +371,12 @@ function renderZemi(){
   document.getElementById("zTag").onchange=e=>{ zemiFilter.tag=e.target.value; renderZemi(); };
   document.getElementById("zQ").addEventListener("keydown",e=>{ if(e.key==="Enter"){ zemiFilter.q=e.target.value; renderZemi(); } });
 }
+function lmsLinkHtml(url){
+  if(url.includes("kulms")){
+    return '<span class="lmsbox"><a class="btn ghost" href="https://kulms.tl.kansai-u.ac.jp/webclass/" target="_blank" rel="noopener">1. LMSにログイン</a> <a class="btn" href="'+esc(url)+'" target="_blank" rel="noopener">2. 資料を開く</a><br><span class="dim">LMSは未ログインで開くと、ログイン後にトップへ戻ってしまいます。先にログインしてから「2. 資料を開く」を押してください（ログイン済みなら2だけでOK）</span></span>';
+  }
+  return '<a href="'+esc(url)+'" target="_blank" rel="noopener">'+esc(url)+'</a>';
+}
 function renderZemiDetail(id, tab){
   zemiTab = ["about","posts","info"].includes(tab) ? tab : "about";
   const z = ZEMI.find(x=>x.id===id);
@@ -388,7 +394,7 @@ function renderZemiDetail(id, tab){
     + '<div class="kv"><span>タグ</span><p>'+(z.tags||[]).map(t=>'<span class="tag">'+esc(t)+'</span>').join(" ")+'</p></div>'
     + '<div class="kv"><span>紹介</span><p class="pre">'+esc(z.intro||"")+'</p></div>'
     + '<div class="kv"><span>説明会</span><p>'+(brief? esc(brief) : '<span class="dim">情報募集中（「説明会・動画」タブから追加できます）</span>')+'</p></div>'
-    + '<div class="kv"><span>オンデマンド</span><p>'+(ond? (ond.startsWith("http")? '<a href="'+esc(ond)+'" target="_blank" rel="noopener">'+(ond.includes("do_contents")? "関大LMSの資料を開く（要ログイン）" : esc(ond))+'</a>' : esc(ond)) : '<span class="dim">情報募集中</span>')+'</p></div>'
+    + '<div class="kv"><span>オンデマンド</span><p>'+(ond? (ond.startsWith("http")? lmsLinkHtml(ond) : esc(ond)) : '<span class="dim">情報募集中</span>')+'</p></div>'
     + '</section>';
   }
   if(zemiTab==="posts"){
@@ -457,7 +463,7 @@ function renderCalendar(){
       const ond = info.ondemand ?? z.ondemand ?? "";
       return '<div class="listrow"><div><a href="#/zemi/'+esc(z.id)+'"><strong>'+esc(z.teacher)+' ゼミ</strong></a>'
       + '<div class="card-meta">説明会: '+(brief? esc(brief) : '<span class="dim">情報募集中</span>')
-      + '<br>オンデマンド: '+(ond? (ond.startsWith("http")? '<a href="'+esc(ond)+'" target="_blank" rel="noopener">'+(ond.includes("do_contents")? "関大LMSの資料を開く（要ログイン）" : esc(ond))+'</a>' : esc(ond)) : '<span class="dim">情報募集中</span>')+'</div></div>'
+      + '<br>オンデマンド: '+(ond? (ond.startsWith("http")? lmsLinkHtml(ond) : esc(ond)) : '<span class="dim">情報募集中</span>')+'</div></div>'
       + '<a class="btn small ghost" href="#/zemi/'+esc(z.id)+'/info">追加・編集</a></div>';
     }).join("")
   + '</section>';
