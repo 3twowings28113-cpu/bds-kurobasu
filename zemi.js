@@ -1,7 +1,8 @@
 // ゼミ（専門演習）データ
 // 研究分野の出典: 関西大学ビジネスデータサイエンス学部パンフレット2026＋公式シラバス。
-// 説明会日程・オンデマンド情報の出典: 関大LMS「個別説明会一覧表」（2026年度、2026-10-29回収）。
-// オンデマンド動画は関大LMS内でのみ視聴可能（公開URLなし）。学生がアプリ内から上書き・追加もできる。
+// 説明会日程・オンデマンド情報の出典: 関大LMS「2027年度開講『専門演習１』申込手続き」コース（2026-10-29回収）。
+// オンデマンド欄のURLは関大LMS内の各先生の配信資料への直リンク（要LMSログイン・BDS学部生のみ閲覧可）。
+// 学生がアプリ内から上書き・追加もできる。
 window.BDS_ZEMI = [
  {
   "id": "yada",
@@ -16,7 +17,7 @@ window.BDS_ZEMI = [
   ],
   "intro": "大規模データの戦略的活用とデータマイニングのビジネス応用が専門。企業の現場でのデータ活用経験が豊富で、BDS学部の中心的なゼミのひとつ。",
   "briefing": "",
-  "ondemand": "オンデマンド動画あり（関大LMSの個別説明会一覧から視聴）"
+  "ondemand": "https://kulms.tl.kansai-u.ac.jp/webclass/do_contents.php?reset_status=1&set_contents_id=e3a7b16febced9af66d6a12ca02930a8"
  },
  {
   "id": "washio",
@@ -29,8 +30,8 @@ window.BDS_ZEMI = [
    "データサイエンス"
   ],
   "intro": "学部長。人工知能・データサイエンスが専門で、データから価値を創出する実現力と洞察力を身に付ける教育を掲げている。",
-  "briefing": "11/5(木) 昼休み S002",
-  "ondemand": "オンデマンド動画あり（2本、関大LMSから視聴）"
+  "briefing": "11/5(木) 昼休み S002 / オンデマンド資料その2: https://kulms.tl.kansai-u.ac.jp/webclass/do_contents.php?reset_status=1&set_contents_id=6469f873553098bea55dd25f6952c048",
+  "ondemand": "https://kulms.tl.kansai-u.ac.jp/webclass/do_contents.php?reset_status=1&set_contents_id=c4e87e79c5a1a33d8f7eca3f3138d79a"
  },
  {
   "id": "kamata",
@@ -45,7 +46,7 @@ window.BDS_ZEMI = [
   ],
   "intro": "日本マイクロソフトでソリューションアーキテクチャー本部長を務めた実務家教員。PBL演習（AI時代のビジネスにおけるデータ分析と実践）も担当。",
   "briefing": "10/27(火) 14:00〜16:00 S002 / 10/28(水) 2限 S204",
-  "ondemand": "なし（対面のみ）"
+  "ondemand": "https://kulms.tl.kansai-u.ac.jp/webclass/do_contents.php?reset_status=1&set_contents_id=c99f415848c41f7f05a6a0235b901d85"
  },
  {
   "id": "fukui",
@@ -59,7 +60,7 @@ window.BDS_ZEMI = [
   ],
   "intro": "人工知能・データサイエンスが専門。機械学習の授業も担当し、研究を社会に還元するためベンチャー企業の取締役も務める。",
   "briefing": "10/23(金) 昼休み S205",
-  "ondemand": "オンデマンド動画あり（10/22から関大LMSで公開）"
+  "ondemand": "https://kulms.tl.kansai-u.ac.jp/webclass/do_contents.php?reset_status=1&set_contents_id=cec5c1677a3c5f38683e664335d28991"
  },
  {
   "id": "misaki",
@@ -86,8 +87,8 @@ window.BDS_ZEMI = [
    "PBL"
   ],
   "intro": "PBL演習（生成AIを用いたデータ分析と実践的応用）を担当。生成AIを使った実践的なデータ分析に強い。",
-  "briefing": "10/26(月) 5限 S203 / 10/28(水) 5限 S203 / 11/5(木) 5限 S104",
-  "ondemand": "オンデマンド動画あり（関大LMSの個別説明会一覧から視聴）。質問はメール sunayama@kansai-u.ac.jp"
+  "briefing": "10/26(月) 5限 S203 / 10/28(水) 5限 S203 / 11/5(木) 5限 S104（質問はメール sunayama@kansai-u.ac.jp）",
+  "ondemand": "https://kulms.tl.kansai-u.ac.jp/webclass/do_contents.php?reset_status=1&set_contents_id=7013f0f3f0da1235a6a245479218a5d3"
  },
  {
   "id": "takai",
@@ -114,7 +115,7 @@ window.BDS_ZEMI = [
   ],
   "intro": "マーケティング論を担当。「マーケティングを学ぶと日々の生活で見える景色が違ってくる」がモットー。",
   "briefing": "10/26(月) 昼休み S204 / 10/28(水) 12:45〜 S206 / 11/9(月) 5限 S103",
-  "ondemand": "オンデマンド動画あり（関大LMSの個別説明会一覧から視聴）"
+  "ondemand": "https://kulms.tl.kansai-u.ac.jp/webclass/do_contents.php?reset_status=1&set_contents_id=1e05a1710a5846dc7fe576e4658cb135"
  },
  {
   "id": "mukai",
@@ -142,7 +143,7 @@ window.BDS_ZEMI = [
   ],
   "intro": "機械学習と生体信号処理が専門。異分野融合の研究経験を基にしたゼミ運営が特徴。",
   "briefing": "10/27(火) 昼休み S105 / 11/5(木) 昼休み N107",
-  "ondemand": "なし（対面のみ）"
+  "ondemand": "https://kulms.tl.kansai-u.ac.jp/webclass/do_contents.php?reset_status=1&set_contents_id=b2999b53475de42eaaaee6727d25e824"
  },
  {
   "id": "suga",
@@ -157,7 +158,7 @@ window.BDS_ZEMI = [
   ],
   "intro": "強化学習とエージェントの授業を担当。マルチエージェントシミュレーションなど、動きのあるテーマを扱う。",
   "briefing": "",
-  "ondemand": "オンデマンド動画あり（関大LMSの個別説明会一覧から視聴）"
+  "ondemand": "https://kulms.tl.kansai-u.ac.jp/webclass/do_contents.php?reset_status=1&set_contents_id=5ac6c24215229393fcc358a983ae3079"
  },
  {
   "id": "nakahara",
@@ -199,7 +200,7 @@ window.BDS_ZEMI = [
   ],
   "intro": "実践情報理論・因果推論を担当。英語文献や数理寄りのテーマに挑戦したい人向け。",
   "briefing": "",
-  "ondemand": "オンデマンド動画あり（関大LMSの個別説明会一覧から視聴）"
+  "ondemand": "https://kulms.tl.kansai-u.ac.jp/webclass/do_contents.php?reset_status=1&set_contents_id=ef2d22dcad6ba7ffeae58c0ba5920b78"
  },
  {
   "id": "ichikawa",
@@ -213,7 +214,7 @@ window.BDS_ZEMI = [
   ],
   "intro": "クラウド・ビッグデータシステムを担当。インフラ・システム寄りの実践テーマが中心。",
   "briefing": "",
-  "ondemand": "オンデマンド動画あり（関大LMSの個別説明会一覧から視聴）"
+  "ondemand": "https://kulms.tl.kansai-u.ac.jp/webclass/do_contents.php?reset_status=1&set_contents_id=631b62d4acddf6676332e47bd8fbcfcf"
  },
  {
   "id": "sano",
@@ -254,7 +255,7 @@ window.BDS_ZEMI = [
   ],
   "intro": "コープさっぽろ執行役員の実務家。実データがあり、売場やアプリで実証実験もできる。札幌在住でリモート併用、日程は相談制、分析はExcelとKNIME中心。（日程・配信情報は関大LMS「個別説明会一覧表」2026年度分より）",
   "briefing": "対面は10/22(木) 2限の1回のみ（終了）",
-  "ondemand": "オンデマンド動画あり（関大LMSから視聴、11/9まで）。質問はメールで随時受付"
+  "ondemand": "https://kulms.tl.kansai-u.ac.jp/webclass/do_contents.php?reset_status=1&set_contents_id=5235a3bdafc94f38a1a299713f0a4bff"
  },
  {
   "id": "ikeda",
@@ -295,7 +296,7 @@ window.BDS_ZEMI = [
   ],
   "intro": "センサーデータを使った混雑予測や農業DXなど社会で使う研究。企業や自治体と連携する前提で学外とのつながりは強い。フィールドワークや機器いじりあり。（日程・配信情報は関大LMS「個別説明会一覧表」2026年度分より）",
   "briefing": "10/26(月) 4限 S002 / 10/28(水) 5限 S206 / 11/5(木) 5限 S102",
-  "ondemand": "なし（対面のみ）"
+  "ondemand": "https://kulms.tl.kansai-u.ac.jp/webclass/do_contents.php?reset_status=1&set_contents_id=6d52099b96114da5aa876f5d2ea71526"
  },
  {
   "id": "nakazono",
@@ -345,7 +346,7 @@ window.BDS_ZEMI = [
   "tags": [],
   "intro": "（日程・配信情報は関大LMS「個別説明会一覧表」2026年度分より）",
   "briefing": "",
-  "ondemand": "オンデマンド動画あり（関大LMSの個別説明会一覧から視聴）"
+  "ondemand": "https://kulms.tl.kansai-u.ac.jp/webclass/do_contents.php?reset_status=1&set_contents_id=c5722078a9033d1815e9cb1eb30fc271"
  },
  {
   "id": "ishibashi",
@@ -355,7 +356,7 @@ window.BDS_ZEMI = [
   "tags": [],
   "intro": "（日程・配信情報は関大LMS「個別説明会一覧表」2026年度分より）",
   "briefing": "10/26(月) 5限 S102 / 10/27(火) 昼休み S103 / 11/9(月) 5限 S101",
-  "ondemand": "オンデマンド動画あり（関大LMSの個別説明会一覧から視聴）"
+  "ondemand": "https://kulms.tl.kansai-u.ac.jp/webclass/do_contents.php?reset_status=1&set_contents_id=08dc55b576308d3c8998e09433952e59"
  },
  {
   "id": "kawai",
@@ -369,13 +370,13 @@ window.BDS_ZEMI = [
  },
  {
   "id": "murakumo",
-  "teacher": "叢",
+  "teacher": "叢（ソウ ズイシン）",
   "title": "",
   "field": "",
   "tags": [],
   "intro": "氏名の詳細は要項で要確認。（日程・配信情報は関大LMS「個別説明会一覧表」2026年度分より）",
   "briefing": "リアルタイム配信: 10/26(月)・10/30(金)・11/6(金) の昼",
-  "ondemand": "オンデマンド動画あり（関大LMSの個別説明会一覧から視聴）"
+  "ondemand": "https://kulms.tl.kansai-u.ac.jp/webclass/do_contents.php?reset_status=1&set_contents_id=fcb0275607679399ab18161fbcd49bdf"
  },
  {
   "id": "teacher-a",
