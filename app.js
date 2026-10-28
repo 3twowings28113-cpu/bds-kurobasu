@@ -449,11 +449,24 @@ function renderCalendar(){
     cells += '<div class="cal-cell'+(ds===today?" today":"")+'"><span class="cal-d">'+d+'</span>'+evs.map(ev=>'<span class="cal-ev '+esc(ev.type||"その他")+'">'+esc(ev.title)+'</span>').join("")+'</div>';
   }
   const upcoming = events.filter(ev=>ev.date>=today).sort((a,b)=>a.date<b.date?-1:1).slice(0,10);
+  const zemiSchedule = '<section class="panel"><h3>ゼミ説明会・オンデマンド一覧</h3>'
+  + '<p class="note">全ゼミの説明会日程とオンデマンド動画URLの一覧です。分かった人が各ゼミの「説明会・動画」タブから追加・更新できます。</p>'
+  + ZEMI.map(z=>{
+      const info = zemiInfo[z.id] || {};
+      const brief = info.briefing ?? z.briefing ?? "";
+      const ond = info.ondemand ?? z.ondemand ?? "";
+      return '<div class="listrow"><div><a href="#/zemi/'+esc(z.id)+'"><strong>'+esc(z.teacher)+' ゼミ</strong></a>'
+      + '<div class="card-meta">説明会: '+(brief? esc(brief) : '<span class="dim">情報募集中</span>')
+      + '<br>オンデマンド: '+(ond? '<a href="'+esc(ond)+'" target="_blank" rel="noopener">'+esc(ond)+'</a>' : '<span class="dim">情報募集中</span>')+'</div></div>'
+      + '<a class="btn small ghost" href="#/zemi/'+esc(z.id)+'/info">追加・編集</a></div>';
+    }).join("")
+  + '</section>';
   $app.innerHTML =
   '<h2 class="sec"><span class="sec-en">CALENDAR</span>みんなのカレンダー</h2>'
   + '<p class="sec-note">テスト日、ゼミ説明会、レポート締切など、みんなで追加していくカレンダーです。</p>'
   + '<div class="cal-head"><button class="btn small ghost" id="calPrev">← 前の月</button><h3>'+y+'年'+(m+1)+'月</h3><button class="btn small ghost" id="calNext">次の月 →</button></div>'
   + '<div class="cal-grid"><div class="cal-w">日</div><div class="cal-w">月</div><div class="cal-w">火</div><div class="cal-w">水</div><div class="cal-w">木</div><div class="cal-w">金</div><div class="cal-w">土</div>'+cells+'</div>'
+  + zemiSchedule
   + '<section class="panel"><h3>これからの予定</h3>'
   + (upcoming.length ? upcoming.map(ev=>'<div class="listrow"><div><strong>'+esc(ev.title)+'</strong><div class="card-meta">'+esc(ev.date)+' ／ '+esc(ev.type||"")+(ev.memo? ' ／ '+esc(ev.memo):'')+'</div></div><span class="tag">'+esc(ev.type||"その他")+'</span></div>').join("") : '<div class="empty">登録されている予定はありません。</div>')
   + '</section>'
