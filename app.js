@@ -13,6 +13,16 @@ function toast(msg){ const t=document.createElement("div"); t.className="toast";
 function navTo(hash){ if(location.hash === hash){ route(); } else location.hash = hash; }
 
 let user = load("bds_user", null);
+let clicks = load("bds_clicks", []);
+function trackClick(kind, label, url){
+  clicks.push({ t: new Date().toISOString(), u: user ? { n:user.name, g:user.grade, e:user.enrollYear||"", gy:user.gradYear||"", f:user.fac||"" } : null, kind: kind, label: label, url: url });
+  if(clicks.length > 500) clicks = clicks.slice(-500);
+  save("bds_clicks", clicks);
+}
+document.addEventListener("click", function(e){
+  const a = e.target && e.target.closest ? e.target.closest("a[data-track]") : null;
+  if(a) trackClick(a.dataset.track, a.dataset.label || a.textContent.trim(), a.href);
+});
 let reviews = load("bds_reviews", {});
 let exams = load("bds_exams", {});
 let zemiPosts = load("bds_zemi_posts", {});
@@ -30,7 +40,7 @@ if(!board){ board = [
 function renderUserbox(){
   const box = document.getElementById("userbox");
   if(user){
-    box.innerHTML = '<span class="chip">'+esc(user.grade)+'回生 '+esc(user.name)+'</span><button id="logoutBtn" class="ubtn">登録を変更</button>';
+    box.innerHTML = '<span class="chip">'+esc(user.grade)+'回生 '+esc(user.name)+(user.gradYear ? '（'+(+user.gradYear-2000)+'卒）' : '')+'</span><button id="logoutBtn" class="ubtn">登録を変更</button>';
     document.getElementById("logoutBtn").onclick = () => { showGate(); };
   } else {
     box.innerHTML = '<button id="loginBtn" class="ubtn solid">学生登録</button>';
@@ -43,25 +53,39 @@ function showGate(){
   + '<p class="note">BDSクロバスは<strong>関西大学の学生だけ</strong>が使える場所です。先生や学外の人は登録できません。<br>登録には、大学のログインで使う<strong>学籍番号（kから始まるID）</strong>が必要です。</p>'
   + '<div class="err" id="gateErr"></div>'
   + '<div class="formgrid">'
-  + '<div class="field"><label>名前（ニックネームでもOK。本名でなくて大丈夫です）</label><input id="gName" type="text" placeholder="例: つばさ" autocomplete="off"></div>'
+  + '<div class="field"><label>名前（フルネーム）</label><input id="gName" type="text" placeholder="例: 山下 翼" autocomplete="off"></div>'
   + '<div class="field"><label>学籍番号（k + 数字6桁。例: k924030）</label><input id="gSid" type="text" placeholder="ここに学籍番号を入力" autocomplete="off"></div>'
   + '<div class="field"><label>学年</label><select id="gGrade"><option value="">選んでください</option><option>1</option><option>2</option><option>3</option><option>4</option></select></div>'
   + '<div class="field"><label>学部</label><select id="gFac"><option>ビジネスデータサイエンス学部</option><option>その他の学部（関大生）</option></select></div>'
+  + '<div class="field"><label>入学年度</label><select id="gEnroll"><option value="">選んでください</option>'+[2022,2023,2024,2025,2026,2027].map(function(y){return '<option value="'+y+'">'+y+'年</option>';}).join("")+'</select></div>'
+  + '<div class="field"><label>卒業年度</label><select id="gGrad"><option value="">選んでください</option>'+[2026,2027,2028,2029,2030,2031].map(function(y){return '<option value="'+y+'">'+y+'年</option>';}).join("")+'</select></div>'
   + '</div>'
-  + '<p class="note">※ 学籍番号は形式チェックだけに使い、保存も送信もしません。</p>'
+  + '<p class="note">※ 学籍番号は形式チェックだけに使い、保存も送信もしません。<br>※ 名前・年度は、サイト内のリンク（イベント情報など）をクリックした記録と一緒にこの端末へ保存され、後から「誰がどのリンクを使ったか」を確認するために使います。</p>'
   + '<button class="btn" id="gateSubmit" style="width:100%">'+(user ? '登録を変更する' : '登録してはじめる')+'</button>'
   + (user ? '<button class="btn ghost" id="gateCancel" style="width:100%;margin-top:8px">キャンセル</button><button id="gateDelete" style="width:100%;margin-top:10px;background:none;border:0;color:#9B2226;font-size:13px">登録情報を消す（投稿はこの端末に残ります）</button>' : '')
   + '</div></div>';
   const err = document.getElementById("gateErr");
+  if(user){
+    document.getElementById("gName").value = user.name || "";
+    document.getElementById("gGrade").value = user.grade || "";
+    document.getElementById("gFac").value = user.fac || "ビジネスデータサイエンス学部";
+    document.getElementById("gEnroll").value = user.enrollYear || "";
+    document.getElementById("gGrad").value = user.gradYear || "";
+  }
+  document.getElementById("gEnroll").onchange = function(e){ const y = +e.target.value; if(y) document.getElementById("gGrad").value = String(y + 4); };
   document.getElementById("gateSubmit").onclick = () => {
     const name = document.getElementById("gName").value.trim();
     const sid = document.getElementById("gSid").value.trim().toLowerCase();
     const grade = document.getElementById("gGrade").value;
     const fac = document.getElementById("gFac").value;
-    if(!name){ err.style.display="block"; err.textContent="名前を入力してください（ニックネームでOKです）"; return; }
+    const enrollYear = document.getElementById("gEnroll").value;
+    const gradYear = document.getElementById("gGrad").value;
+    if(!name){ err.style.display="block"; err.textContent="名前（フルネーム）を入力してください"; return; }
     if(!/^k\d{6}$/.test(sid)){ err.style.display="block"; err.textContent="学籍番号の形式が違います。「k + 数字6桁」で入力してください。例: k924030"; return; }
     if(!grade){ err.style.display="block"; err.textContent="学年を選んでください"; return; }
-    user = { name, grade, fac };
+    if(!enrollYear){ err.style.display="block"; err.textContent="入学年度を選んでください"; return; }
+    if(!gradYear){ err.style.display="block"; err.textContent="卒業年度を選んでください"; return; }
+    user = { name: name, grade: grade, fac: fac, enrollYear: enrollYear, gradYear: gradYear };
     save("bds_user", user);
     $modal.innerHTML = "";
     renderUserbox();
@@ -74,7 +98,8 @@ function showGate(){
   if(del) del.onclick = () => { localStorage.removeItem("bds_user"); user=null; $modal.innerHTML=""; renderUserbox(); toast("登録情報を消しました"); route(); };
 }
 function requireUser(){
-  if(user) return true;
+  if(user && user.enrollYear && user.gradYear) return true;
+  if(user){ showGate(); toast("入学年度・卒業年度の登録をお願いします"); return false; }
   showGate();
   toast("投稿するには学生登録が必要です");
   return false;
@@ -163,7 +188,7 @@ function renderHome(){
   + '<h2 class="sec"><span class="sec-en">MENU</span>何をしますか</h2>'
   + '<div class="menugrid">'+ menu.map(([h,en,ja,d,cls])=>'<a class="menucard '+cls+'" href="'+h+'"><span class="mc-en">'+en+'</span><span class="mc-ja">'+ja+'</span><span class="mc-d">'+d+'</span><span class="mc-arrow">→</span></a>').join("") +'</div>'
   + '<h2 class="sec"><span class="sec-en">HOW TO</span>はじめての方へ</h2>'
-  + '<div class="steps"><div class="step"><strong>1. 学生登録</strong><p>学籍番号（k+数字6桁）の形式チェックで、関大生だけが投稿できます。閲覧は登録なしでもOK。</p></div>'
+  + '<div class="steps"><div class="step"><strong>1. 学生登録</strong><p>学籍番号（k+数字6桁）の形式チェック＋フルネーム・入学/卒業年度の登録で、関大生だけが投稿できます。閲覧は登録なしでもOK。</p></div>'
   + '<div class="step"><strong>2. 授業を探す</strong><p>「定期テスト100%」「定期テストなし」のような条件で絞り込めます。割合はシラバス原文の自動解析です。</p></div>'
   + '<div class="step"><strong>3. 知っていることを残す</strong><p>受けた授業の口コミ、過去問の傾向、ゼミの雰囲気。あなたの1件が、次の学年の「先輩」になります。</p></div></div>';
   document.getElementById("homeSearch").onclick = () => { courseFilter = {q:document.getElementById("homeQ").value.trim(), preset:"", term:"", day:"", tag:"", minTest:"", sort:"name"}; coursePage=1; navTo("#/courses"); };
@@ -371,9 +396,9 @@ function renderZemi(){
   document.getElementById("zTag").onchange=e=>{ zemiFilter.tag=e.target.value; renderZemi(); };
   document.getElementById("zQ").addEventListener("keydown",e=>{ if(e.key==="Enter"){ zemiFilter.q=e.target.value; renderZemi(); } });
 }
-function lmsLinkHtml(url){
+function lmsLinkHtml(url, label){
   if(url.includes("kulms")){
-    return '<span class="lmsbox"><a class="btn ghost" href="https://kulms.tl.kansai-u.ac.jp/webclass/" target="_blank" rel="noopener">1. LMSにログイン</a> <a class="btn" href="'+esc(url)+'" target="_blank" rel="noopener">2. 資料を開く</a><br><span class="dim">LMSは未ログインで開くと、ログイン後にトップへ戻ってしまいます。先にログインしてから「2. 資料を開く」を押してください（ログイン済みなら2だけでOK）</span></span>';
+    return '<span class="lmsbox"><a class="btn ghost" href="https://kulms.tl.kansai-u.ac.jp/webclass/" target="_blank" rel="noopener">1. LMSにログイン</a> <a class="btn" data-track="lms" data-label="'+esc(label || "LMS資料")+'" href="'+esc(url)+'" target="_blank" rel="noopener">2. 資料を開く</a><br><span class="dim">LMSは未ログインで開くと、ログイン後にトップへ戻ってしまいます。先にログインしてから「2. 資料を開く」を押してください（ログイン済みなら2だけでOK）</span></span>';
   }
   return '<a href="'+esc(url)+'" target="_blank" rel="noopener">'+esc(url)+'</a>';
 }
@@ -394,7 +419,7 @@ function renderZemiDetail(id, tab){
     + '<div class="kv"><span>タグ</span><p>'+(z.tags||[]).map(t=>'<span class="tag">'+esc(t)+'</span>').join(" ")+'</p></div>'
     + '<div class="kv"><span>紹介</span><p class="pre">'+esc(z.intro||"")+'</p></div>'
     + '<div class="kv"><span>説明会</span><p>'+(brief? esc(brief) : '<span class="dim">情報募集中（「説明会・動画」タブから追加できます）</span>')+'</p></div>'
-    + '<div class="kv"><span>オンデマンド</span><p>'+(ond? (ond.startsWith("http")? lmsLinkHtml(ond) : esc(ond)) : '<span class="dim">情報募集中</span>')+'</p></div>'
+    + '<div class="kv"><span>オンデマンド</span><p>'+(ond? (ond.startsWith("http")? lmsLinkHtml(ond, "ゼミ資料: " + z.teacher) : esc(ond)) : '<span class="dim">情報募集中</span>')+'</p></div>'
     + '</section>';
   }
   if(zemiTab==="posts"){
@@ -463,7 +488,7 @@ function renderCalendar(){
       const ond = info.ondemand ?? z.ondemand ?? "";
       return '<div class="listrow"><div><a href="#/zemi/'+esc(z.id)+'"><strong>'+esc(z.teacher)+' ゼミ</strong></a>'
       + '<div class="card-meta">説明会: '+(brief? esc(brief) : '<span class="dim">情報募集中</span>')
-      + '<br>オンデマンド: '+(ond? (ond.startsWith("http")? lmsLinkHtml(ond) : esc(ond)) : '<span class="dim">情報募集中</span>')+'</div></div>'
+      + '<br>オンデマンド: '+(ond? (ond.startsWith("http")? lmsLinkHtml(ond, "ゼミ資料: " + z.teacher) : esc(ond)) : '<span class="dim">情報募集中</span>')+'</div></div>'
       + '<a class="btn small ghost" href="#/zemi/'+esc(z.id)+'/info">追加・編集</a></div>';
     }).join("")
   + '</section>';
@@ -589,9 +614,22 @@ function renderBoard(){
 }
 
 /* ---------- mypage (candidates) ---------- */
+function mypageTop(){
+  const prof = user
+    ? '<section class="panel"><h3>登録情報</h3><p><strong>'+esc(user.name)+'</strong> ／ '+esc(user.grade)+'回生 ／ '+esc(user.fac || "")+'<br>入学年度: '+(user.enrollYear ? user.enrollYear+"年" : "未登録")+' ／ 卒業年度: '+(user.gradYear ? user.gradYear+"年（"+(+user.gradYear-2000)+"卒）" : "未登録")+'</p><button class="btn small ghost" id="editProf">登録を変更</button></section>'
+    : '<section class="panel"><h3>登録情報</h3><p>まだ登録していません。</p><button class="btn small" id="editProf">学生登録</button></section>';
+  const rows = clicks.slice(-50).reverse().map(function(c){
+    return '<div class="listrow"><div><strong>'+esc(c.label || c.url || "")+'</strong><div class="card-meta">'+esc((c.t || "").replace("T", " ").slice(0, 16))+' ／ '+(c.u ? esc(c.u.n)+"（"+(c.u.gy ? (+c.u.gy-2000)+"卒" : "?")+"）" : "未登録")+'</div></div></div>';
+  }).join("");
+  const clickHtml = '<section class="panel"><h3>リンククリック履歴（送客の成果確認用）</h3>'
+  + '<p class="note">このサイト内のリンク（ゼミ資料など）をクリックした記録です。将来ここに就活イベント情報を載せたとき、「誰がどのリンクから行ったか」を後から確認するための土台です。<strong>今はこの端末の中だけに保存</strong>されていて、みんなの記録を1か所に集めるには共有の仕組み（バックエンド）が必要です。</p>'
+  + (clicks.length ? rows + '<div style="display:flex;gap:8px;margin-top:10px"><button class="btn small" id="copyClicks">履歴をコピー（表計算に貼れます）</button><button class="btn small ghost" id="clearClicks">履歴を消す</button></div>' : '<div class="empty">まだ記録がありません。</div>')
+  + '</section>';
+  return prof + clickHtml;
+}
 function renderMypage(){
   const list = candidates.map(id=>COURSES.find(c=>c.id===id)).filter(Boolean);
-  $app.innerHTML =
+  $app.innerHTML = mypageTop() +
   '<h2 class="sec"><span class="sec-en">MY LIST</span>履修候補リスト</h2>'
   + '<p class="sec-note">授業ページで「履修候補に入れる」を押した授業がここにたまります。単位とテスト傾向の目安にどうぞ。</p>'
   + (list.length ? '<section class="panel">'
@@ -600,6 +638,9 @@ function renderMypage(){
     + '<p class="note">時間割としての重なりチェックは今後の課題です。</p></section>'
     : '<div class="empty">まだ候補がありません。<a href="#/courses">授業を探す</a>から気になる授業を入れてください。</div>');
   $app.querySelectorAll("[data-rm]").forEach(b=>b.onclick=()=>{ candidates = candidates.filter(x=>x!==b.dataset.rm); save("bds_candidates", candidates); renderMypage(); });
+  const ep = document.getElementById("editProf"); if(ep) ep.onclick = function(){ showGate(); };
+  const cc = document.getElementById("copyClicks"); if(cc) cc.onclick = function(){ const tsv = clicks.map(function(c){ return [(c.t || "").slice(0, 10), c.u ? c.u.n : "", c.u ? c.u.gy : "", c.label || "", c.url || ""].join("\t"); }).join("\n"); if(navigator.clipboard) navigator.clipboard.writeText(tsv).then(function(){ toast("コピーしました"); }); };
+  const cl = document.getElementById("clearClicks"); if(cl) cl.onclick = function(){ clicks = []; save("bds_clicks", clicks); renderMypage(); };
 }
 
 /* ---------- init ---------- */
