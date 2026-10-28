@@ -181,7 +181,7 @@ function renderHome(){
   + '<p class="hero-en">KANSAI UNIVERSITY — BUSINESS DATA SCIENCE</p>'
   + '<h1>先輩のいない学部の、<br>みんなの情報庫。</h1>'
   + '<p class="hero-sub">どの授業がテスト何割か、どのゼミが自分に合いそうか、教科書は誰か譲ってくれないか。BDS学部の学生同士で、情報を分け合う場所です。</p>'
-  + '<div class="hero-search"><input type="text" id="homeQ" placeholder="授業名・先生の名前で検索（例: 経営戦略論、福井）"><button class="btn" id="homeSearch">授業を探す</button></div>'
+  + '<div class="hero-search"><input type="text" id="homeQ" placeholder="授業名・先生・内容で検索（例: Python、経営戦略論、福井）"><button class="btn" id="homeSearch">授業を探す</button></div>'
   + '<p class="hero-credit">トップ画像: 関西大学公式サイト（ビジネスデータサイエンス学部）／ 授業データは公式シラバス（2026年度）から</p>'
   + '</div></section>'
   + '<section class="stats"><div><strong>'+COURSES.length+'</strong><span>授業クラス</span></div><div><strong>'+ZEMI.length+'</strong><span>ゼミ</span></div><div><strong>'+totalReviews+'</strong><span>口コミ</span></div><div><strong>'+totalExams+'</strong><span>過去問情報</span></div></section>'
@@ -196,12 +196,13 @@ function renderHome(){
 }
 
 /* ---------- courses list ---------- */
-function courseCard(c){
+function courseCard(c, pos, total){
   const rs = courseReviews(c);
   const avg = avgStars(c);
   const ex = (exams[c.id]||[]).length;
   const inCand = candidates.includes(c.id);
   return '<article class="card">'
+  + (pos != null ? '<span class="posbadge">'+(pos+1)+'件目 / 全'+total+'件</span>' : '')
   + '<a class="card-main" href="#/course/'+encodeURIComponent(c.name)+'"><h3>'+esc(c.name)+'</h3></a>'
   + '<p class="card-meta">'+esc(c.instructor)+' ／ '+esc(c.term||"")+' '+esc(c.schedule||"")+' ／ '+esc(c.credits||"")+'単位'+(rs.length? ' ／ 口コミ'+rs.length+'件':'')+(ex? ' ／ 過去問'+ex+'件':'')+'</p>'
   + (avg!==null && rs.length>=3 ? '<p class="card-stars">'+stars(avg)+' 取りやすさ '+avg.toFixed(1)+'（'+rs.length+'件）</p>' : (rs.length? '<p class="card-stars dim">口コミ'+rs.length+'件（平均は3件から表示）</p>':''))
@@ -223,7 +224,7 @@ function bindCourseCards(){
 function applyFilter(list){
   const f = courseFilter;
   let out = list.filter(c=>{
-    if(f.q){ const q=f.q.toLowerCase(); if(!(c.name.toLowerCase().includes(q)||(c.instructor||"").toLowerCase().includes(q))) return false; }
+    if(f.q){ const q=f.q.toLowerCase(); const hay=(c.name+" "+(c.instructor||"")+" "+(c.desc||"")+" "+(c.textbook||"")+" "+(c.tags||[]).join(" ")).toLowerCase(); if(!hay.includes(q)) return false; }
     if(f.term && !(c.term||"").includes(f.term)) return false;
     if(f.day && !(c.schedule||"").includes(f.day)) return false;
     if(f.tag && !(c.tags||[]).includes(f.tag)) return false;
@@ -257,7 +258,7 @@ function renderCourses(){
   '<h2 class="sec"><span class="sec-en">COURSES</span>授業を探す</h2>'
   + '<p class="sec-note">公式シラバス（2026年度・BDS学部専門教育科目 全'+COURSES.length+'クラス）から、評価の割合で探せます。割合はシラバス原文からの自動解析のため誤差がある場合があります。必ず各授業の公式シラバス原文で確認してください。</p>'
   + '<div class="filters"><div class="row">'
-  + '<div class="field" style="flex:1;min-width:200px"><label>キーワード（授業名・先生）</label><input type="text" id="fQ" value="'+esc(courseFilter.q)+'" placeholder="例: マーケティング、福井"></div>'
+  + '<div class="field" style="flex:1;min-width:200px"><label>キーワード（授業名・先生・内容）</label><input type="text" id="fQ" value="'+esc(courseFilter.q)+'" placeholder="例: Python、マーケティング、福井"></div>'
   + '<div class="field"><label>学期</label><select id="fTerm"><option value="">すべて</option>'+["春","秋"].map(t=>'<option '+(courseFilter.term===t?"selected":"")+'>'+t+'</option>').join("")+'</select></div>'
   + '<div class="field"><label>曜日</label><select id="fDay"><option value="">すべて</option>'+["月","火","水","木","金","土"].map(t=>'<option '+(courseFilter.day===t?"selected":"")+'>'+t+'</option>').join("")+'</select></div>'
   + '<div class="field"><label>分野</label><select id="fTag"><option value="">すべて</option>'+tags.map(t=>'<option '+(courseFilter.tag===t?"selected":"")+'>'+esc(t)+'</option>').join("")+'</select></div>'
@@ -268,7 +269,7 @@ function renderCourses(){
   + '<div class="sortbar">並び替え: <select id="fSort">'
   + [["name","授業名順"],["testDesc","テスト割合が高い順"],["testAsc","テスト割合が低い順"],["attendDesc","出席・平常が高い順"],["easy","口コミの取りやすさ順"],["reviews","口コミが多い順"]].map(([k,l])=>'<option value="'+k+'" '+(courseFilter.sort===k?"selected":"")+'>'+l+'</option>').join("")
   + '</select>　<strong>'+filtered.length+'件</strong>見つかりました</div>'
-  + (slice.length? '<div class="grid">'+slice.map(courseCard).join("")+'</div>' : '<div class="empty">条件に合う授業が見つかりませんでした。条件をゆるめてみてください。</div>')
+  + (slice.length? '<div class="grid">'+slice.map(function(c,i){ return courseCard(c, (coursePage-1)*perPage+i, filtered.length); }).join("")+'</div>' : '<div class="empty">条件に合う授業が見つかりませんでした。条件をゆるめてみてください。</div>')
   + (pages>1 ? '<div class="pager">'+Array.from({length:pages},(_,i)=>'<button data-page="'+(i+1)+'" class="'+(coursePage===i+1?"on":"")+'">'+(i+1)+'</button>').join("")+'</div>' : '');
   const upd = () => { courseFilter.q=document.getElementById("fQ").value; courseFilter.term=document.getElementById("fTerm").value; courseFilter.day=document.getElementById("fDay").value; courseFilter.tag=document.getElementById("fTag").value; courseFilter.minTest=document.getElementById("fMinTest").value; courseFilter.sort=document.getElementById("fSort").value; coursePage=1; renderCourses(); };
   ["fTerm","fDay","fTag","fSort"].forEach(id=>document.getElementById(id).onchange=upd);
@@ -396,8 +397,9 @@ function renderZemi(){
   document.getElementById("zTag").onchange=e=>{ zemiFilter.tag=e.target.value; renderZemi(); };
   document.getElementById("zQ").addEventListener("keydown",e=>{ if(e.key==="Enter"){ zemiFilter.q=e.target.value; renderZemi(); } });
 }
-function lmsLinkHtml(url, label){
+function lmsLinkHtml(url, label, compact){
   if(url.includes("kulms")){
+    if(compact) return '<a class="btn small" data-track="lms" data-label="'+esc(label || "LMS資料")+'" href="'+esc(url)+'" target="_blank" rel="noopener">LMS資料を開く</a> <span class="dim">(未ログイン時は先にLMSログイン)</span>';
     return '<span class="lmsbox"><a class="btn ghost" href="https://kulms.tl.kansai-u.ac.jp/webclass/" target="_blank" rel="noopener">1. LMSにログイン</a> <a class="btn" data-track="lms" data-label="'+esc(label || "LMS資料")+'" href="'+esc(url)+'" target="_blank" rel="noopener">2. 資料を開く</a><br><span class="dim">LMSは未ログインで開くと、ログイン後にトップへ戻ってしまいます。先にログインしてから「2. 資料を開く」を押してください（ログイン済みなら2だけでOK）</span></span>';
   }
   return '<a href="'+esc(url)+'" target="_blank" rel="noopener">'+esc(url)+'</a>';
@@ -488,7 +490,7 @@ function renderCalendar(){
       const ond = info.ondemand ?? z.ondemand ?? "";
       return '<div class="listrow"><div><a href="#/zemi/'+esc(z.id)+'"><strong>'+esc(z.teacher)+' ゼミ</strong></a>'
       + '<div class="card-meta">説明会: '+(brief? esc(brief) : '<span class="dim">情報募集中</span>')
-      + '<br>オンデマンド: '+(ond? (ond.startsWith("http")? lmsLinkHtml(ond, "ゼミ資料: " + z.teacher) : esc(ond)) : '<span class="dim">情報募集中</span>')+'</div></div>'
+      + '<br>オンデマンド: '+(ond? (ond.startsWith("http")? lmsLinkHtml(ond, "ゼミ資料: " + z.teacher, true) : esc(ond)) : '<span class="dim">情報募集中</span>')+'</div></div>'
       + '<a class="btn small ghost" href="#/zemi/'+esc(z.id)+'/info">追加・編集</a></div>';
     }).join("")
   + '</section>';
