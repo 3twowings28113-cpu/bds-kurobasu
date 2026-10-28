@@ -388,7 +388,7 @@ function renderZemiDetail(id, tab){
     + '<div class="kv"><span>タグ</span><p>'+(z.tags||[]).map(t=>'<span class="tag">'+esc(t)+'</span>').join(" ")+'</p></div>'
     + '<div class="kv"><span>紹介</span><p class="pre">'+esc(z.intro||"")+'</p></div>'
     + '<div class="kv"><span>説明会</span><p>'+(brief? esc(brief) : '<span class="dim">情報募集中（「説明会・動画」タブから追加できます）</span>')+'</p></div>'
-    + '<div class="kv"><span>オンデマンド</span><p>'+(ond? '<a href="'+esc(ond)+'" target="_blank" rel="noopener">'+esc(ond)+'</a>' : '<span class="dim">情報募集中</span>')+'</p></div>'
+    + '<div class="kv"><span>オンデマンド</span><p>'+(ond? (ond.startsWith("http")? '<a href="'+esc(ond)+'" target="_blank" rel="noopener">'+esc(ond)+'</a>' : esc(ond)) : '<span class="dim">情報募集中</span>')+'</p></div>'
     + '</section>';
   }
   if(zemiTab==="posts"){
@@ -457,7 +457,7 @@ function renderCalendar(){
       const ond = info.ondemand ?? z.ondemand ?? "";
       return '<div class="listrow"><div><a href="#/zemi/'+esc(z.id)+'"><strong>'+esc(z.teacher)+' ゼミ</strong></a>'
       + '<div class="card-meta">説明会: '+(brief? esc(brief) : '<span class="dim">情報募集中</span>')
-      + '<br>オンデマンド: '+(ond? '<a href="'+esc(ond)+'" target="_blank" rel="noopener">'+esc(ond)+'</a>' : '<span class="dim">情報募集中</span>')+'</div></div>'
+      + '<br>オンデマンド: '+(ond? (ond.startsWith("http")? '<a href="'+esc(ond)+'" target="_blank" rel="noopener">'+esc(ond)+'</a>' : esc(ond)) : '<span class="dim">情報募集中</span>')+'</div></div>'
       + '<a class="btn small ghost" href="#/zemi/'+esc(z.id)+'/info">追加・編集</a></div>';
     }).join("")
   + '</section>';
