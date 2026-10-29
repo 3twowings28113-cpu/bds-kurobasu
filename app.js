@@ -34,6 +34,7 @@ let books = load("bds_books", []);
 let board = load("bds_board", null);
 let candidates = load("bds_candidates", []);
 let absences = load("bds_absences", {});
+let going = load("bds_going", {});
 books.forEach(b=>{ b.type = b.type || "sell"; b.status = b.status || "open"; b.msgs = b.msgs || []; b.place = b.place || ""; b.when = b.when || ""; });
 if(!board){ board = [
   {id:"seed-b1", title:"BDSクロバスが始まりました", body:"1期生には先輩の口コミも過去問もない。だから自分たちで作ります。受けた授業の口コミ、ゼミの雰囲気、テスト日程、使い終わった教科書。次の学年のためにも、知っていることを少しずつ残していってください。", cat:"お知らせ", by:"運営", grade:"-", date:"2026-10-28"}
@@ -130,6 +131,14 @@ function avgStars(entry){
   return (rs.reduce((s,r)=>s+(+(r.overall || r.easy)||0),0)/rs.length);
 }
 function stars(n){ const f = Math.round(n); return "★★★★★".slice(0,f) + "☆☆☆☆☆".slice(0,5-f); }
+function initStars(state){
+  $app.querySelectorAll(".starinput").forEach(box=>{
+    const row = box.dataset.row;
+    const draw = ()=>{ box.innerHTML = [1,2,3,4,5].map(v=>'<button type="button" class="starbtn '+(v<=state[row]?"on":"")+'" data-v="'+v+'">★</button>').join("") + '<span class="starval">'+(state[row] ? state[row] : "未選択")+'</span>';
+      box.querySelectorAll(".starbtn").forEach(b=>b.onclick=()=>{ state[row]=+b.dataset.v; draw(); }); };
+    draw();
+  });
+}
 
 /* ---------- router ---------- */
 let courseFilter = { q:"", preset:"", term:"", day:"", tag:"", minTest:"", sort:"name" };
@@ -169,11 +178,18 @@ function evInpersonTag(ev){
   const z = ZEMI.find(x=>x.teacher === ev.title.slice(7));
   return (z && zemiFormats(z).includes("inperson")) ? ' <span class="tag inperson">対面のみ</span>' : "";
 }
+function evGoingKey(ev){
+  if(ev.title.indexOf("ゼミ説明会: ") !== 0) return "";
+  return ev.date + "|" + ev.title.slice(7);
+}
+function evIsGoing(ev){ const k = evGoingKey(ev); return !!(k && going[k]); }
+function evGoingTag(ev){ return evIsGoing(ev) ? ' <span class="tag going">絶対行く</span>' : ""; }
 function evActions(ev){
   let zid = "";
   if(ev.title.indexOf("ゼミ説明会: ") === 0){ const t = ev.title.slice(7); const z = ZEMI.find(x=>x.teacher === t); if(z) zid = z.id; }
   return (zid ? '<a class="btn small ghost" href="#/zemi/' + zid + '">ゼミの情報を見る</a> ' : '')
-    + '<a class="btn small ghost" href="' + gcalUrl(ev) + '" target="_blank" rel="noopener">Googleカレンダーに追加</a>';
+    + '<a class="btn small ghost" href="' + gcalUrl(ev) + '" target="_blank" rel="noopener">Googleカレンダーに追加</a>'
+    + (zid ? ' <button class="btn small ' + (evIsGoing(ev) ? 'goingbtn' : 'ghost') + '" data-going="' + esc(evGoingKey(ev)) + '">' + (evIsGoing(ev) ? '✓ 絶対行く' : '絶対行くにする') + '</button>' : '');
 }
 let calPresetTitle = "";
 
@@ -409,12 +425,7 @@ function renderCourseDetail(name, tab){
   }
   if(courseTab==="reviews"){
     const rv = { overall:0, easy:0, rich:0, heavy:0 };
-    $app.querySelectorAll(".starinput").forEach(box=>{
-      const row = box.dataset.row;
-      const draw = ()=>{ box.innerHTML = [1,2,3,4,5].map(v=>'<button type="button" class="starbtn '+(v<=rv[row]?"on":"")+'" data-v="'+v+'">★</button>').join("") + '<span class="starval">'+(rv[row] ? rv[row] : "未選択")+'</span>';
-        box.querySelectorAll(".starbtn").forEach(b=>b.onclick=()=>{ rv[row]=+b.dataset.v; draw(); }); };
-      draw();
-    });
+    initStars(rv);
     document.getElementById("rSubmit").onclick=()=>{
       if(!requireUser()) return;
       if(!rv.overall){ toast("総合評価の星を選んでください"); return; }
@@ -497,6 +508,28 @@ function lmsLinkHtml(url, label, compact){
   }
   return '<a href="'+esc(url)+'" target="_blank" rel="noopener">'+esc(url)+'</a>';
 }
+function zemiSessions(z, briefText){
+  const b = (briefText ?? z.briefing ?? "").trim();
+  if(!b || b === "説明会なし") return [];
+  const out = [];
+  b.split(" / ").forEach(seg=>{
+    const ms = [...seg.matchAll(/(\d{1,2})\/(\d{1,2})/g)];
+    ms.forEach(m=>out.push({ date:"2026-" + String(m[1]).padStart(2,"0") + "-" + String(m[2]).padStart(2,"0"), memo: seg }));
+  });
+  out.sort((a,b)=> a.date===b.date ? evTime({memo:a.memo}) - evTime({memo:b.memo}) : (a.date<b.date?-1:1));
+  return out;
+}
+function sessSection(z, briefText){
+  const sess = zemiSessions(z, briefText);
+  if(!sess.length) return "";
+  return '<section class="panel"><h3>説明会の日程（行く日を選べます）</h3>'
+  + '<p class="note">絶対行きたい回は「絶対行く」にすると、カレンダーで緑色に目立ちます。そのままGoogleカレンダーにも入れられます。</p>'
+  + sess.map(s=>{ const k = s.date + "|" + z.teacher; const on = !!going[k];
+      return '<div class="listrow"><div><strong>' + esc(s.date) + '</strong><div class="card-meta">' + esc(s.memo) + '</div></div>'
+      + '<div style="display:flex;gap:6px;flex:none"><a class="btn small ghost" href="' + gcalUrl({date:s.date, title:"ゼミ説明会: " + z.teacher, memo:s.memo}) + '" target="_blank" rel="noopener">Gカレンダー</a>'
+      + '<button class="btn small ' + (on ? 'goingbtn' : 'ghost') + '" data-gosess="' + esc(k) + '">' + (on ? '✓ 絶対行く' : '絶対行くにする') + '</button></div></div>'; }).join("")
+  + '</section>';
+}
 function renderZemiDetail(id, tab){
   zemiTab = ["about","posts","info"].includes(tab) ? tab : "about";
   const z = ZEMI.find(x=>x.id===id);
@@ -515,7 +548,7 @@ function renderZemiDetail(id, tab){
     + '<div class="kv"><span>紹介</span><p class="pre">'+esc(z.intro||"")+'</p></div>'
     + '<div class="kv"><span>説明会</span><p>'+(brief? linkifyBrief(brief) : '<span class="dim">情報募集中（「説明会・動画」タブから追加できます）</span>')+'</p></div>'
     + '<div class="kv"><span>オンデマンド</span><p>'+(ond? (ond.startsWith("http")? lmsLinkHtml(ond, "ゼミ資料: " + z.teacher) : esc(ond)) : '<span class="dim">情報募集中</span>')+'</p></div>'
-    + '</section>';
+    + '</section>' + sessSection(z, brief);
   }
   if(zemiTab==="posts"){
     body = '<section class="panel"><h3>みんなの書き込み（'+posts.length+'件）</h3>'
@@ -541,6 +574,7 @@ function renderZemiDetail(id, tab){
   + '<div class="tabbar">'+tabBtn("about","ゼミ情報")+tabBtn("posts","書き込み（"+posts.length+"）")+tabBtn("info","説明会・動画")+'</div>'
   + body;
   $app.querySelectorAll("[data-ztab]").forEach(b=>b.onclick=()=>{ navTo("#/zemi/"+id+"/"+b.dataset.ztab); });
+  $app.querySelectorAll("[data-gosess]").forEach(b=>b.onclick=()=>{ const k=b.dataset.gosess; if(going[k]) delete going[k]; else going[k]=true; save("bds_going", going); renderZemiDetail(id, zemiTab); });
   if(zemiTab==="posts"){
     document.getElementById("zpSubmit").onclick=()=>{
       if(!requireUser()) return;
@@ -575,7 +609,7 @@ function renderCalendar(){
   for(let d=1; d<=days; d++){
     const ds = y+"-"+String(m+1).padStart(2,"0")+"-"+String(d).padStart(2,"0");
     const evs = byDay[ds] || [];
-    cells += '<div class="cal-cell'+(ds===today?" today":"")+(ds===calSel?" sel":"")+'" data-day="'+ds+'"><span class="cal-d">'+d+'</span>'+evs.slice(0,3).map(ev=>'<span class="cal-ev '+esc(ev.type||"その他")+(evIsInperson(ev)?" inp":"")+'">'+esc(ev.short || ev.title)+'</span>').join("")+(evs.length>3? '<span class="cal-ev more'+(evs.slice(3).some(evIsInperson)?" inp":"")+'">他'+(evs.length-3)+'件</span>':'')+'</div>';
+    cells += '<div class="cal-cell'+(ds===today?" today":"")+(ds===calSel?" sel":"")+'" data-day="'+ds+'"><span class="cal-d">'+d+'</span>'+evs.slice(0,3).map(ev=>'<span class="cal-ev '+esc(ev.type||"その他")+(evIsInperson(ev)?" inp":"")+(evIsGoing(ev)?" going":"")+'">'+esc(ev.short || ev.title)+'</span>').join("")+(evs.length>3? '<span class="cal-ev more'+(evs.slice(3).some(evIsInperson)?" inp":"")+'">他'+(evs.length-3)+'件</span>':'')+'</div>';
   }
   const upcoming = allEvents().filter(ev=>ev.date>=today).sort((a,b)=> a.date===b.date ? byTime(a,b) : (a.date<b.date?-1:1)).slice(0,14);
   const todayEvs = byDay[today] || [];
@@ -585,13 +619,13 @@ function renderCalendar(){
         let label = (ev.short || ev.title) + (tm ? " " + tm[0] : "");
         const zz = ev.title.indexOf("ゼミ説明会: ") === 0 ? ZEMI.find(x=>x.teacher === ev.title.slice(7)) : null;
         if(zz && zemiFormats(zz).includes("inperson")) label += "・対面のみ";
-        if(zz) return '<a class="ts-chip' + (zemiFormats(zz).includes("inperson") ? " inp" : "") + '" href="#/zemi/' + zz.id + '">' + esc(label) + '</a>';
+        if(zz) return '<a class="ts-chip' + (zemiFormats(zz).includes("inperson") ? " inp" : "") + (going[today + "|" + zz.teacher] ? " going" : "") + '" href="#/zemi/' + zz.id + '">' + esc(label) + '</a>';
         return '<button class="ts-chip" data-selday="' + today + '">' + esc(label) + '</button>';
       }).join("") : '<span class="dim">今日の予定はありません</span>')
     + '</div>';
   const selLabel = calSel === today ? "今日の予定" : calSel + " の予定";
   const dayPanel = '<section class="panel" id="dayPanel"><h3>' + esc(selLabel) + '</h3>'
-    + ((byDay[calSel] || []).length ? (byDay[calSel] || []).map(ev=>'<div class="listrow"><div><strong>'+esc(ev.title)+'</strong>'+evInpersonTag(ev)+'<div class="card-meta">'+esc(ev.type||"")+(ev.memo? ' / '+esc(ev.memo):'')+'</div><div style="margin-top:6px">'+evActions(ev)+'</div></div></div>').join("") : '<div class="empty">この日の予定はありません。日付をタップするとその日の予定が見られます。</div>')
+    + ((byDay[calSel] || []).length ? (byDay[calSel] || []).map(ev=>'<div class="listrow"><div><strong>'+esc(ev.title)+'</strong>'+evInpersonTag(ev)+evGoingTag(ev)+'<div class="card-meta">'+esc(ev.type||"")+(ev.memo? ' / '+esc(ev.memo):'')+'</div><div style="margin-top:6px">'+evActions(ev)+'</div></div></div>').join("") : '<div class="empty">この日の予定はありません。日付をタップするとその日の予定が見られます。</div>')
     + '</section>';
   const zemiSchedule = '<section class="panel"><h3>ゼミ説明会・オンデマンド一覧</h3>'
   + '<p class="note">全ゼミの説明会日程とオンデマンド動画URLの一覧です。ボタンで形式ごとに絞り込めます。</p>'
@@ -615,7 +649,7 @@ function renderCalendar(){
   + dayPanel
   + zemiSchedule
   + '<section class="panel"><h3>これからの予定</h3>'
-   + (upcoming.length ? upcoming.map(ev=>'<div class="listrow"><div><strong>'+esc(ev.title)+'</strong>'+evInpersonTag(ev)+'<div class="card-meta">'+esc(ev.date)+' ／ '+esc(ev.type||"")+(ev.memo? ' ／ '+esc(ev.memo):'')+'</div><div style="margin-top:6px">'+evActions(ev)+'</div></div><span class="tag">'+esc(ev.type||"その他")+'</span></div>').join("") : '<div class="empty">登録されている予定はありません。</div>')
+   + (upcoming.length ? upcoming.map(ev=>'<div class="listrow"><div><strong>'+esc(ev.title)+'</strong>'+evInpersonTag(ev)+evGoingTag(ev)+'<div class="card-meta">'+esc(ev.date)+' ／ '+esc(ev.type||"")+(ev.memo? ' ／ '+esc(ev.memo):'')+'</div><div style="margin-top:6px">'+evActions(ev)+'</div></div><span class="tag">'+esc(ev.type||"その他")+'</span></div>').join("") : '<div class="empty">登録されている予定はありません。</div>')
   + '</section>'
   + '<section class="panel"><h3>予定を追加</h3><div class="formgrid">'
   + '<div class="field"><label>日付</label><input id="evDate" type="date" value="'+today+'"></div>'
@@ -629,6 +663,7 @@ function renderCalendar(){
   $app.querySelectorAll("[data-cfmt]").forEach(b=>b.onclick=()=>{ calZemiFmt=b.dataset.cfmt; renderCalendar(); });
   $app.querySelectorAll("[data-day]").forEach(c=>c.onclick=()=>{ calSel=c.dataset.day; renderCalendar(); const p=document.getElementById("dayPanel"); if(p) p.scrollIntoView({behavior:"smooth", block:"start"}); });
   $app.querySelectorAll("[data-selday]").forEach(c=>c.onclick=()=>{ calSel=c.dataset.selday; renderCalendar(); const p=document.getElementById("dayPanel"); if(p) p.scrollIntoView({behavior:"smooth", block:"start"}); });
+  $app.querySelectorAll("[data-going]").forEach(b=>b.onclick=()=>{ const k=b.dataset.going; if(going[k]) delete going[k]; else going[k]=true; save("bds_going", going); renderCalendar(); });
   document.getElementById("evSubmit").onclick=()=>{
     if(!requireUser()) return;
     const title = document.getElementById("evTitle").value.trim();
@@ -740,11 +775,36 @@ function renderReviews(){
   const ranked = COURSES.map(c=>({c, avg:avgStars(c), n:courseReviews(c).length})).filter(x=>x.n>=3 && x.avg!==null).sort((a,b)=>b.avg-a.avg).slice(0,5);
   $app.innerHTML =
   '<h2 class="sec"><span class="sec-en">REVIEWS</span>みんなの口コミ</h2>'
-  + '<p class="sec-note">全授業の口コミの新着と、評価の高い授業です。受けた授業の口コミは、各授業のページから書けます。</p>'
+  + '<p class="sec-note">全授業の口コミの新着と、評価の高い授業です。下のフォームからすぐ書けます。</p>'
+  + '<section class="panel"><h3>口コミを書く</h3><div class="formgrid">'
+  + '<div class="field"><label>授業名</label><input id="fCourse" type="text" list="courseNames" placeholder="例: AI基礎"><datalist id="courseNames">' + [...new Set(COURSES.map(c=>c.name))].map(n=>'<option value="'+esc(n)+'">').join("") + '</datalist></div>'
+  + '<div class="field"><label>先生</label><select id="fTeacher"><option value="">（先に授業名を入力）</option></select></div>'
+  + '<div class="field" style="grid-column:1/-1"><label>総合評価（星をタップ）</label><div class="starinput" data-row="overall"></div></div>'
+  + '<div class="field"><label>取りやすさ</label><div class="starinput" data-row="easy"></div></div>'
+  + '<div class="field"><label>充実度</label><div class="starinput" data-row="rich"></div></div>'
+  + '<div class="field"><label>課題の重さ（星が多いほど重い）</label><div class="starinput" data-row="heavy"></div></div>'
+  + '<div class="field" style="grid-column:1/-1"><label>本文（任意）</label><textarea id="fBody" rows="3" placeholder="テストの傾向、出席の厳しさ、課題の量など、後輩が知りたいことを"></textarea></div>'
+  + '</div><button class="btn" id="fSubmit">口コミを投稿</button></section>'
   + (ranked.length ? '<section class="panel"><h3>評価の高い授業（口コミ3件以上）</h3>' + ranked.map(x=>'<div class="listrow"><div><a href="#/course/'+encodeURIComponent(x.c.name)+'/reviews"><strong>'+esc(x.c.name)+'</strong></a><div class="card-meta">'+esc(x.c.instructor)+' ／ 口コミ'+x.n+'件</div></div><span class="card-stars">'+stars(x.avg)+' '+x.avg.toFixed(1)+'</span></div>').join("") + '</section>' : '')
   + '<section class="panel"><h3>新着の口コミ</h3>'
-  + (all.length ? all.slice(0,30).map(function(it){ const r=it.r, c=it.c; const o=+(r.overall || r.easy)||0; const dims=[["取りやすさ",r.easy],["充実度",r.rich],["課題の重さ",r.heavy]].filter(d=>+d[1]>0).map(d=>d[0]+" "+stars(+d[1])).join(" ／ "); return '<div class="post"><p class="post-head"><a href="#/course/'+encodeURIComponent(c.name)+'/reviews"><strong>'+esc(c.name)+'</strong></a>（'+esc(c.instructor)+'） <span class="revstars">'+stars(o)+'</span> 総合'+(o||"-")+(dims? ' ／ '+dims : '')+' <span>'+esc(r.by||"")+' ・ '+esc(r.date||"")+'</span></p><p>'+esc(r.body||"")+'</p></div>'; }).join("") : '<div class="empty">まだ口コミがありません。授業ページから最初の1件を書いてください。</div>')
+  + (all.length ? all.slice(0,30).map(function(it){ const r=it.r, c=it.c; const o=+(r.overall || r.easy)||0; const dims=[["取りやすさ",r.easy],["充実度",r.rich],["課題の重さ",r.heavy]].filter(d=>+d[1]>0).map(d=>d[0]+" "+stars(+d[1])).join(" ／ "); return '<div class="post"><p class="post-head"><a href="#/course/'+encodeURIComponent(c.name)+'/reviews"><strong>'+esc(c.name)+'</strong></a>（'+esc(c.instructor)+'） <span class="revstars">'+stars(o)+'</span> 総合'+(o||"-")+(dims? ' ／ '+dims : '')+' <span>'+esc(r.by||"")+' ・ '+esc(r.date||"")+'</span></p><p>'+esc(r.body||"")+'</p></div>'; }).join("") : '<div class="empty">まだ口コミがありません。上のフォームから最初の1件を書いてください。</div>')
   + '</section>';
+  const fv = { overall:0, easy:0, rich:0, heavy:0 };
+  initStars(fv);
+  const courseInput = document.getElementById("fCourse");
+  const teacherSel = document.getElementById("fTeacher");
+  const fillTeachers = ()=>{ const nm = courseInput.value.trim(); const ts = [...new Set(COURSES.filter(c=>c.name===nm).map(c=>c.instructor))]; teacherSel.innerHTML = ts.length ? ts.map(t=>'<option>'+esc(t)+'</option>').join("") : '<option value="">（授業名を候補から選んでください）</option>'; };
+  courseInput.addEventListener("change", fillTeachers);
+  courseInput.addEventListener("blur", fillTeachers);
+  document.getElementById("fSubmit").onclick = ()=>{
+    if(!requireUser()) return;
+    const nm = courseInput.value.trim(); const teacher = teacherSel.value;
+    const entry = COURSES.find(c=>c.name===nm && c.instructor===teacher) || COURSES.find(c=>c.name===nm);
+    if(!entry){ toast("授業名を候補から選んでください"); return; }
+    if(!fv.overall){ toast("総合評価の星を選んでください"); return; }
+    (reviews[entry.id] = reviews[entry.id] || []).unshift({ overall:fv.overall, easy:fv.easy||"", rich:fv.rich||"", heavy:fv.heavy||"", body:document.getElementById("fBody").value.trim(), by:user.name+"（"+user.grade+"回生）", date:todayStr() });
+    save("bds_reviews", reviews); toast("口コミを投稿しました"); renderReviews();
+  };
 }
 
 /* ---------- mypage (candidates) ---------- */
