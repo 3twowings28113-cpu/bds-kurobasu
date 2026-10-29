@@ -149,6 +149,16 @@ function gcalUrl(ev){
   const d2 = nx.getFullYear() + String(nx.getMonth() + 1).padStart(2, "0") + String(nx.getDate()).padStart(2, "0");
   return "https://calendar.google.com/calendar/render?action=TEMPLATE&text=" + encodeURIComponent(ev.title) + "&dates=" + d + "/" + d2 + "&details=" + encodeURIComponent((ev.memo || "") + " (BDSクロバス)");
 }
+function evTime(ev){
+  const m = (ev.memo || "") + " " + (ev.title || "");
+  const t = m.match(/(\d{1,2}):(\d{2})/);
+  if(t) return (+t[1]) * 60 + (+t[2]);
+  if(m.includes("昼")) return 12 * 60 + 20;
+  const p = m.match(/(\d)\s*限/);
+  if(p) return ({1:540, 2:640, 3:780, 4:880, 5:980, 6:1080})[+p[1]] || 9999;
+  return 9999;
+}
+function byTime(a, b){ return evTime(a) - evTime(b) || (a.title < b.title ? -1 : 1); }
 function evIsInperson(ev){
   if(ev.title.indexOf("ゼミ説明会: ") !== 0) return false;
   const z = ZEMI.find(x=>x.teacher === ev.title.slice(7));
@@ -559,6 +569,7 @@ function renderCalendar(){
   const today = todayStr();
   const byDay = {};
   allEvents().forEach(ev=>{ (byDay[ev.date] = byDay[ev.date] || []).push(ev); });
+  Object.values(byDay).forEach(a=>a.sort(byTime));
   let cells = "";
   for(let i=0;i<startDay;i++) cells += '<div class="cal-cell blank"></div>';
   for(let d=1; d<=days; d++){
@@ -566,7 +577,7 @@ function renderCalendar(){
     const evs = byDay[ds] || [];
     cells += '<div class="cal-cell'+(ds===today?" today":"")+(ds===calSel?" sel":"")+'" data-day="'+ds+'"><span class="cal-d">'+d+'</span>'+evs.slice(0,3).map(ev=>'<span class="cal-ev '+esc(ev.type||"その他")+(evIsInperson(ev)?" inp":"")+'">'+esc(ev.short || ev.title)+'</span>').join("")+(evs.length>3? '<span class="cal-ev more'+(evs.slice(3).some(evIsInperson)?" inp":"")+'">他'+(evs.length-3)+'件</span>':'')+'</div>';
   }
-  const upcoming = allEvents().filter(ev=>ev.date>=today).sort((a,b)=>a.date<b.date?-1:1).slice(0,14);
+  const upcoming = allEvents().filter(ev=>ev.date>=today).sort((a,b)=> a.date===b.date ? byTime(a,b) : (a.date<b.date?-1:1)).slice(0,14);
   const todayEvs = byDay[today] || [];
   const todayStrip = '<div class="todaystrip"><span class="ts-label">今日の予定</span>'
     + (todayEvs.length ? todayEvs.map(ev=>{
