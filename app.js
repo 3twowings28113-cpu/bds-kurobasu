@@ -33,6 +33,7 @@ function allEvents(){ return SEED_EVENTS.concat(events.filter(e=>!SEED_EVENTS.so
 let books = load("bds_books", []);
 let board = load("bds_board", null);
 let candidates = load("bds_candidates", []);
+let absences = load("bds_absences", {});
 books.forEach(b=>{ b.type = b.type || "sell"; b.status = b.status || "open"; b.msgs = b.msgs || []; b.place = b.place || ""; b.when = b.when || ""; });
 if(!board){ board = [
   {id:"seed-b1", title:"BDSクロバスが始まりました", body:"1期生には先輩の口コミも過去問もない。だから自分たちで作ります。受けた授業の口コミ、ゼミの雰囲気、テスト日程、使い終わった教科書。次の学年のためにも、知っていることを少しずつ残していってください。", cat:"お知らせ", by:"運営", grade:"-", date:"2026-10-28"}
@@ -126,7 +127,7 @@ function gbar(c){
 function courseReviews(entry){ return reviews[entry.id] || []; }
 function avgStars(entry){
   const rs = courseReviews(entry); if(!rs.length) return null;
-  return (rs.reduce((s,r)=>s+(+r.easy||0),0)/rs.length);
+  return (rs.reduce((s,r)=>s+(+(r.overall || r.easy)||0),0)/rs.length);
 }
 function stars(n){ const f = Math.round(n); return "★★★★★".slice(0,f) + "☆☆☆☆☆".slice(0,5-f); }
 
@@ -174,6 +175,7 @@ function route(){
   else if(p[0]==="calendar"){ setNav("calendar"); renderCalendar(); }
   else if(p[0]==="books"){ setNav("books"); renderBooks(); }
   else if(p[0]==="board"){ setNav("board"); renderBoard(); }
+  else if(p[0]==="reviews"){ setNav("reviews"); renderReviews(); }
   else if(p[0]==="mypage"){ setNav("mypage"); renderMypage(); }
   else { setNav("home"); renderHome(); }
 }
@@ -221,7 +223,7 @@ function courseCard(c, pos, total){
   + (pos != null ? '<span class="posbadge">'+(pos+1)+'件目 / 全'+total+'件</span>' : '')
   + '<a class="card-main" href="#/course/'+encodeURIComponent(c.name)+'"><h3>'+esc(c.name)+'</h3></a>'
   + '<p class="card-meta">'+esc(c.instructor)+' ／ '+esc(c.term||"")+' '+esc(c.schedule||"")+' ／ '+esc(c.credits||"")+'単位'+(rs.length? ' ／ 口コミ'+rs.length+'件':'')+(ex? ' ／ 過去問'+ex+'件':'')+'</p>'
-  + (avg!==null && rs.length>=3 ? '<p class="card-stars">'+stars(avg)+' 取りやすさ '+avg.toFixed(1)+'（'+rs.length+'件）</p>' : (rs.length? '<p class="card-stars dim">口コミ'+rs.length+'件（平均は3件から表示）</p>':''))
+  + (avg!==null && rs.length>=3 ? '<p class="card-stars">'+stars(avg)+' 総合 '+avg.toFixed(1)+'（'+rs.length+'件）</p>' : (rs.length? '<p class="card-stars dim">口コミ'+rs.length+'件（平均は3件から表示）</p>':''))
   + gbar(c)
   + '<p class="card-tags">'+(c.tags||[]).map(t=>'<span class="tag">'+esc(t)+'</span>').join("")+((c.noExam && (c.cats.test||0)===0)?'<span class="tag ok">定期テストなし</span>':'')+'</p>'
   + '<button class="btn small '+(inCand?'ghost':'')+'" data-cand="'+esc(c.id)+'">'+(inCand?'履修候補から外す':'履修候補に入れる')+'</button>'
@@ -283,7 +285,7 @@ function renderCourses(){
   + [["","すべて"],["test100","テスト100%"],["noexam","定期テストなし"],["attend","出席・平常50%以上"],["report","レポート40%以上"],["ondemand","集中・その他曜限"]].map(([k,l])=>'<button class="qchip '+(courseFilter.preset===k?"on":"")+'" data-p="'+k+'">'+l+'</button>').join("")
   + '</div></div>'
   + '<div class="sortbar">並び替え: <select id="fSort">'
-  + [["name","授業名順"],["testDesc","テスト割合が高い順"],["testAsc","テスト割合が低い順"],["attendDesc","出席・平常が高い順"],["easy","口コミの取りやすさ順"],["reviews","口コミが多い順"]].map(([k,l])=>'<option value="'+k+'" '+(courseFilter.sort===k?"selected":"")+'>'+l+'</option>').join("")
+  + [["name","授業名順"],["testDesc","テスト割合が高い順"],["testAsc","テスト割合が低い順"],["attendDesc","出席・平常が高い順"],["easy","口コミの総合評価順"],["reviews","口コミが多い順"]].map(([k,l])=>'<option value="'+k+'" '+(courseFilter.sort===k?"selected":"")+'>'+l+'</option>').join("")
   + '</select>　<strong>'+filtered.length+'件</strong>見つかりました</div>'
   + (slice.length? '<div class="grid">'+slice.map(function(c,i){ return courseCard(c, (coursePage-1)*perPage+i, filtered.length); }).join("")+'</div>' : '<div class="empty">条件に合う授業が見つかりませんでした。条件をゆるめてみてください。</div>')
   + (pages>1 ? '<div class="pager">'+Array.from({length:pages},(_,i)=>'<button data-page="'+(i+1)+'" class="'+(coursePage===i+1?"on":"")+'">'+(i+1)+'</button>').join("")+'</div>' : '');
@@ -303,11 +305,13 @@ function renderCourseDetail(name, tab){
   if(lastCourseName !== name){ selectedTeacherIdx = 0; lastCourseName = name; }
   const entries = COURSES.filter(c=>c.name===name);
   if(!entries.length){ $app.innerHTML = '<div class="empty">授業が見つかりませんでした。<a href="#/courses">授業一覧へ</a></div>'; return; }
-  if(selectedTeacherIdx >= entries.length) selectedTeacherIdx = 0;
-  const c = entries[selectedTeacherIdx];
-  const rs = courseReviews(c);
-  const ex = exams[c.id] || [];
-  const avg = avgStars(c);
+  const teachers = [...new Set(entries.map(e=>e.instructor))];
+  if(selectedTeacherIdx >= teachers.length) selectedTeacherIdx = 0;
+  const tEntries = entries.filter(e=>e.instructor===teachers[selectedTeacherIdx]);
+  const c = tEntries[0];
+  const rs = tEntries.flatMap(e=>courseReviews(e));
+  const ex = tEntries.flatMap(e=>exams[e.id]||[]);
+  const avg = rs.length ? rs.reduce((s,r)=>s+(+(r.overall || r.easy)||0),0)/rs.length : null;
   const tabBtn = (k,label)=>'<button class="tabbtn '+(courseTab===k?"on":"")+'" data-ctab="'+k+'">'+label+'</button>';
   let body = "";
   if(courseTab==="syllabus"){
@@ -322,17 +326,25 @@ function renderCourseDetail(name, tab){
     + '<p class="note">割合はシラバス原文からの自動解析です。原文と違う場合は原文が正です。</p>'
     + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px"><button class="btn small ghost" id="addCal">この授業のテスト日をカレンダーに登録</button>'
     + '<button class="btn small '+(candidates.includes(c.id)?'ghost':'')+'" id="candBtn">'+(candidates.includes(c.id)?'履修候補から外す':'履修候補に入れる')+'</button></div>'
-    + '</section>';
+    + '</section>'
+    + '<section class="panel"><h3>欠席カウンター（自分用・この端末のみ）</h3>'
+    + ((c.id in absences)
+      ? '<p class="absrow"><span class="abscount">'+absences[c.id]+'回</span>休みました'
+        + (absences[c.id]>=3 ? ' <span class="tag warn">目安: あと'+Math.max(0,5-absences[c.id])+'回で危険圏</span>' : '')
+        + '</p><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="absPlus">今日休んだ（+1）</button><button class="btn small ghost" id="absMinus">-1 戻す</button><button class="btn small ghost" id="absReset">リセット</button></div>'
+      : '<p class="note">この授業を履修していたら、休んだ回数をここで数えられます。</p><button class="btn small" id="absTrack">履修中として登録</button>')
+    + '<p class="note">目安: 全15回の授業では5回休むと単位が危ないことが多いです（正確な基準は科目・先生によります）。</p></section>';
   }
   if(courseTab==="reviews"){
     body = '<section class="panel"><h3>口コミ（'+esc(c.instructor)+'先生）</h3>'
-    + (avg!==null && rs.length>=3 ? '<p class="card-stars">'+stars(avg)+' 取りやすさ平均 '+avg.toFixed(1)+'（'+rs.length+'件）</p>' : (rs.length? '<p class="note">口コミは'+rs.length+'件。平均点は3件たまると表示されます。</p>':''))
-    + (rs.length ? rs.map(r=>'<div class="post"><p class="post-head">'+stars(+r.easy||0)+' 取りやすさ ／ 充実度 '+esc(r.rich||"-")+' ／ 課題の重さ '+esc(r.heavy||"-")+' <span>'+esc(r.by||"")+' ・ '+esc(r.date||"")+'</span></p><p>'+esc(r.body||"")+'</p></div>').join("") : '<div class="empty">まだ口コミがありません。受けたことがある人は、最初の1件を書いてください。</div>')
+    + (avg!==null && rs.length>=3 ? '<p class="card-stars">'+stars(avg)+' 総合評価 '+avg.toFixed(1)+'（'+rs.length+'件）</p>' : (rs.length? '<p class="note">口コミは'+rs.length+'件。平均点は3件たまると表示されます。</p>':''))
+    + (rs.length ? rs.map(r=>{ const o=+(r.overall || r.easy)||0; const dims=[["取りやすさ",r.easy],["充実度",r.rich],["課題の重さ",r.heavy]].filter(d=>+d[1]>0).map(d=>d[0]+" "+stars(+d[1])).join(" ／ "); return '<div class="post"><p class="post-head"><span class="revstars">'+stars(o)+'</span> 総合'+(o||"-")+(dims? ' ／ '+dims : '')+' <span>'+esc(r.by||"")+' ・ '+esc(r.date||"")+'</span></p><p>'+esc(r.body||"")+'</p></div>'; }).join("") : '<div class="empty">まだ口コミがありません。受けたことがある人は、最初の1件を書いてください。</div>')
     + '<h4>口コミを書く</h4>'
     + '<div class="formgrid">'
-    + '<div class="field"><label>取りやすさ（1〜5）</label><select id="rEasy"><option>5</option><option>4</option><option selected>3</option><option>2</option><option>1</option></select></div>'
-    + '<div class="field"><label>充実度（1〜5）</label><select id="rRich"><option>5</option><option>4</option><option selected>3</option><option>2</option><option>1</option></select></div>'
-    + '<div class="field"><label>課題の重さ（1=軽い〜5=重い）</label><select id="rHeavy"><option>1</option><option>2</option><option selected>3</option><option>4</option><option>5</option></select></div>'
+    + '<div class="field" style="grid-column:1/-1"><label>総合評価（星をタップ）</label><div class="starinput" data-row="overall"></div></div>'
+    + '<div class="field"><label>取りやすさ</label><div class="starinput" data-row="easy"></div></div>'
+    + '<div class="field"><label>充実度</label><div class="starinput" data-row="rich"></div></div>'
+    + '<div class="field"><label>課題の重さ（星が多いほど重い）</label><div class="starinput" data-row="heavy"></div></div>'
     + '<div class="field" style="grid-column:1/-1"><label>本文（任意）</label><textarea id="rBody" rows="3" placeholder="テストの傾向、出席の厳しさ、課題の量など、後輩が知りたいことを"></textarea></div>'
     + '</div>'
     + '<p class="note">先生個人への誹謗中傷ではなく、授業の事実を書いてください。不適切な投稿は運営が削除します。</p>'
@@ -354,13 +366,21 @@ function renderCourseDetail(name, tab){
   $app.innerHTML =
   '<p class="crumb"><a href="#/courses">← 授業一覧に戻る</a></p>'
   + '<h2 class="detail-title">'+esc(name)+'</h2>'
-  + (entries.length>1 ? '<div class="teachertabs">'+entries.map((e,i)=>'<button class="'+(i===selectedTeacherIdx?"on":"")+'" data-t="'+i+'">'+esc(e.instructor)+'先生</button>').join("")+'</div>' : '<p class="sec-note">担当: '+esc(c.instructor)+'先生 ／ '+esc(c.term||"")+' '+esc(c.schedule||"")+' ／ '+esc(c.credits||"")+'単位</p>')
+  + (teachers.length>1 ? '<div class="teachertabs">'+teachers.map((t,i)=>'<button class="'+(i===selectedTeacherIdx?"on":"")+'" data-t="'+i+'">'+esc(t)+'先生</button>').join("")+'</div>' : '<p class="sec-note">担当: '+esc(c.instructor)+'先生 ／ '+esc(c.term||"")+' '+esc(c.schedule||"")+' ／ '+esc(c.credits||"")+'単位'+(tEntries.length>1 ? ' ／ 全'+tEntries.length+'クラス（口コミ・過去問は合算表示）' : '')+'</p>')
   + '<div class="tabbar">'+tabBtn("syllabus","概要・成績") + tabBtn("reviews","口コミ（"+rs.length+"）") + tabBtn("exams","過去問（"+ex.length+"）")+'</div>'
   + body;
   $app.querySelectorAll("[data-t]").forEach(b=>b.onclick=()=>{ selectedTeacherIdx=+b.dataset.t; renderCourseDetail(name, courseTab); });
   $app.querySelectorAll("[data-ctab]").forEach(b=>b.onclick=()=>{ navTo("#/course/"+encodeURIComponent(name)+"/"+b.dataset.ctab); });
   if(courseTab==="syllabus"){
     document.getElementById("addCal").onclick=()=>{ calPresetTitle = name; navTo("#/calendar"); };
+    const absPlus = document.getElementById("absPlus");
+    if(absPlus){
+      absPlus.onclick=()=>{ absences[c.id]=(absences[c.id]||0)+1; save("bds_absences", absences); renderCourseDetail(name, courseTab); };
+      document.getElementById("absMinus").onclick=()=>{ absences[c.id]=Math.max(0,(absences[c.id]||0)-1); save("bds_absences", absences); renderCourseDetail(name, courseTab); };
+      document.getElementById("absReset").onclick=()=>{ absences[c.id]=0; save("bds_absences", absences); renderCourseDetail(name, courseTab); };
+    }
+    const absTrack = document.getElementById("absTrack");
+    if(absTrack) absTrack.onclick=()=>{ if(!requireUser()) return; absences[c.id]=0; save("bds_absences", absences); toast("履修中として登録しました"); renderCourseDetail(name, courseTab); };
     document.getElementById("candBtn").onclick=()=>{
       if(candidates.includes(c.id)){ candidates = candidates.filter(x=>x!==c.id); toast("履修候補から外しました"); }
       else { if(!requireUser()) return; candidates.push(c.id); toast("履修候補に入れました"); }
@@ -368,9 +388,17 @@ function renderCourseDetail(name, tab){
     };
   }
   if(courseTab==="reviews"){
+    const rv = { overall:0, easy:0, rich:0, heavy:0 };
+    $app.querySelectorAll(".starinput").forEach(box=>{
+      const row = box.dataset.row;
+      const draw = ()=>{ box.innerHTML = [1,2,3,4,5].map(v=>'<button type="button" class="starbtn '+(v<=rv[row]?"on":"")+'" data-v="'+v+'">★</button>').join("") + '<span class="starval">'+(rv[row] ? rv[row] : "未選択")+'</span>';
+        box.querySelectorAll(".starbtn").forEach(b=>b.onclick=()=>{ rv[row]=+b.dataset.v; draw(); }); };
+      draw();
+    });
     document.getElementById("rSubmit").onclick=()=>{
       if(!requireUser()) return;
-      (reviews[c.id] = reviews[c.id] || []).unshift({ easy:document.getElementById("rEasy").value, rich:document.getElementById("rRich").value, heavy:document.getElementById("rHeavy").value, body:document.getElementById("rBody").value.trim(), by:user.name+"（"+user.grade+"回生）", date:todayStr() });
+      if(!rv.overall){ toast("総合評価の星を選んでください"); return; }
+      (reviews[c.id] = reviews[c.id] || []).unshift({ overall:rv.overall, easy:rv.easy||"", rich:rv.rich||"", heavy:rv.heavy||"", body:document.getElementById("rBody").value.trim(), by:user.name+"（"+user.grade+"回生）", date:todayStr() });
       save("bds_reviews", reviews); toast("口コミを投稿しました"); renderCourseDetail(name, "reviews");
     };
   }
@@ -680,6 +708,21 @@ function renderBoard(){
   };
 }
 
+/* ---------- reviews feed ---------- */
+function renderReviews(){
+  const all = [];
+  COURSES.forEach(c=>{ (reviews[c.id]||[]).forEach(r=>all.push({c, r})); });
+  all.sort((a,b)=>((b.r.date||"").localeCompare(a.r.date||"")));
+  const ranked = COURSES.map(c=>({c, avg:avgStars(c), n:courseReviews(c).length})).filter(x=>x.n>=3 && x.avg!==null).sort((a,b)=>b.avg-a.avg).slice(0,5);
+  $app.innerHTML =
+  '<h2 class="sec"><span class="sec-en">REVIEWS</span>みんなの口コミ</h2>'
+  + '<p class="sec-note">全授業の口コミの新着と、評価の高い授業です。受けた授業の口コミは、各授業のページから書けます。</p>'
+  + (ranked.length ? '<section class="panel"><h3>評価の高い授業（口コミ3件以上）</h3>' + ranked.map(x=>'<div class="listrow"><div><a href="#/course/'+encodeURIComponent(x.c.name)+'/reviews"><strong>'+esc(x.c.name)+'</strong></a><div class="card-meta">'+esc(x.c.instructor)+' ／ 口コミ'+x.n+'件</div></div><span class="card-stars">'+stars(x.avg)+' '+x.avg.toFixed(1)+'</span></div>').join("") + '</section>' : '')
+  + '<section class="panel"><h3>新着の口コミ</h3>'
+  + (all.length ? all.slice(0,30).map(function(it){ const r=it.r, c=it.c; const o=+(r.overall || r.easy)||0; const dims=[["取りやすさ",r.easy],["充実度",r.rich],["課題の重さ",r.heavy]].filter(d=>+d[1]>0).map(d=>d[0]+" "+stars(+d[1])).join(" ／ "); return '<div class="post"><p class="post-head"><a href="#/course/'+encodeURIComponent(c.name)+'/reviews"><strong>'+esc(c.name)+'</strong></a>（'+esc(c.instructor)+'） <span class="revstars">'+stars(o)+'</span> 総合'+(o||"-")+(dims? ' ／ '+dims : '')+' <span>'+esc(r.by||"")+' ・ '+esc(r.date||"")+'</span></p><p>'+esc(r.body||"")+'</p></div>'; }).join("") : '<div class="empty">まだ口コミがありません。授業ページから最初の1件を書いてください。</div>')
+  + '</section>';
+}
+
 /* ---------- mypage (candidates) ---------- */
 function mypageTop(){
   const prof = user
@@ -696,7 +739,10 @@ function mypageTop(){
 }
 function renderMypage(){
   const list = candidates.map(id=>COURSES.find(c=>c.id===id)).filter(Boolean);
-  $app.innerHTML = mypageTop() +
+  const absList = Object.keys(absences).map(id=>COURSES.find(c=>c.id===id)).filter(Boolean);
+  const absHtml = '<h2 class="sec"><span class="sec-en">ATTENDANCE</span>欠席カウンター</h2>'
+  + (absList.length ? '<section class="panel">' + absList.map(c=>'<div class="listrow"><div><a href="#/course/'+encodeURIComponent(c.name)+'"><strong>'+esc(c.name)+'</strong></a><div class="card-meta">'+esc(c.instructor)+' ／ '+esc(c.term||"")+' '+esc(c.schedule||"")+'</div></div><span class="abscount small">'+absences[c.id]+'回</span>'+(absences[c.id]>=3 ? '<span class="tag warn">注意</span>' : '')+'</div>').join("") + '<p class="note">目安: 5回休むと単位が危ないことが多いです。カウントは各授業ページでできます。</p></section>' : '<div class="empty">まだ登録がありません。授業ページの「欠席カウンター」から履修中の授業を登録してください。</div>');
+  $app.innerHTML = mypageTop() + absHtml +
   '<h2 class="sec"><span class="sec-en">MY LIST</span>履修候補リスト</h2>'
   + '<p class="sec-note">授業ページで「履修候補に入れる」を押した授業がここにたまります。単位とテスト傾向の目安にどうぞ。</p>'
   + (list.length ? '<section class="panel">'
