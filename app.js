@@ -141,6 +141,19 @@ let calZemiFmt = "";
 let bookFilter = "all";
 let openThreadId = null;
 let calCursor = (()=>{ const d=new Date(); return {y:d.getFullYear(), m:d.getMonth()}; })();
+let calSel = null;
+function gcalUrl(ev){
+  const d = ev.date.replace(/-/g, "");
+  const nx = new Date(ev.date + "T00:00:00"); nx.setDate(nx.getDate() + 1);
+  const d2 = nx.getFullYear() + String(nx.getMonth() + 1).padStart(2, "0") + String(nx.getDate()).padStart(2, "0");
+  return "https://calendar.google.com/calendar/render?action=TEMPLATE&text=" + encodeURIComponent(ev.title) + "&dates=" + d + "/" + d2 + "&details=" + encodeURIComponent((ev.memo || "") + " (BDSクロバス)");
+}
+function evActions(ev){
+  let zid = "";
+  if(ev.title.indexOf("ゼミ説明会: ") === 0){ const t = ev.title.slice(6); const z = ZEMI.find(x=>x.teacher === t); if(z) zid = z.id; }
+  return (zid ? '<a class="btn small ghost" href="#/zemi/' + zid + '">ゼミの情報を見る</a> ' : '')
+    + '<a class="btn small ghost" href="' + gcalUrl(ev) + '" target="_blank" rel="noopener">Googleカレンダーに追加</a>';
+}
 let calPresetTitle = "";
 
 function parseHash(){
@@ -499,6 +512,7 @@ function renderZemiDetail(id, tab){
 
 /* ---------- calendar ---------- */
 function renderCalendar(){
+  if(!calSel) calSel = todayStr();
   const {y, m} = calCursor;
   const first = new Date(y, m, 1);
   const startDay = first.getDay();
@@ -511,7 +525,7 @@ function renderCalendar(){
   for(let d=1; d<=days; d++){
     const ds = y+"-"+String(m+1).padStart(2,"0")+"-"+String(d).padStart(2,"0");
     const evs = byDay[ds] || [];
-    cells += '<div class="cal-cell'+(ds===today?" today":"")+'"><span class="cal-d">'+d+'</span>'+evs.slice(0,3).map(ev=>'<span class="cal-ev '+esc(ev.type||"その他")+'">'+esc(ev.short || ev.title)+'</span>').join("")+(evs.length>3? '<span class="cal-ev more">他'+(evs.length-3)+'件</span>':'')+'</div>';
+    cells += '<div class="cal-cell'+(ds===today?" today":"")+(ds===calSel?" sel":"")+'" data-day="'+ds+'"><span class="cal-d">'+d+'</span>'+evs.slice(0,3).map(ev=>'<span class="cal-ev '+esc(ev.type||"その他")+'">'+esc(ev.short || ev.title)+'</span>').join("")+(evs.length>3? '<span class="cal-ev more">他'+(evs.length-3)+'件</span>':'')+'</div>';
   }
   const upcoming = allEvents().filter(ev=>ev.date>=today).sort((a,b)=>a.date<b.date?-1:1).slice(0,14);
   const zemiSchedule = '<section class="panel"><h3>ゼミ説明会・オンデマンド一覧</h3>'
@@ -533,8 +547,11 @@ function renderCalendar(){
   + '<div class="cal-head"><button class="btn small ghost" id="calPrev">← 前の月</button><h3>'+y+'年'+(m+1)+'月</h3><button class="btn small ghost" id="calNext">次の月 →</button></div>'
   + '<div class="cal-grid"><div class="cal-w">日</div><div class="cal-w">月</div><div class="cal-w">火</div><div class="cal-w">水</div><div class="cal-w">木</div><div class="cal-w">金</div><div class="cal-w">土</div>'+cells+'</div>'
   + zemiSchedule
+  + '<section class="panel"><h3>'+esc(calSel)+' の予定</h3>'
+  + ((byDay[calSel] || []).length ? (byDay[calSel] || []).map(ev=>'<div class="listrow"><div><strong>'+esc(ev.title)+'</strong><div class="card-meta">'+esc(ev.type||"")+(ev.memo? ' ／ '+esc(ev.memo):'')+'</div><div style="margin-top:6px">'+evActions(ev)+'</div></div></div>').join("") : '<div class="empty">この日の予定はありません。日付をタップするとその日の予定が見られます。</div>')
+  + '</section>'
   + '<section class="panel"><h3>これからの予定</h3>'
-  + (upcoming.length ? upcoming.map(ev=>'<div class="listrow"><div><strong>'+esc(ev.title)+'</strong><div class="card-meta">'+esc(ev.date)+' ／ '+esc(ev.type||"")+(ev.memo? ' ／ '+esc(ev.memo):'')+'</div></div><span class="tag">'+esc(ev.type||"その他")+'</span></div>').join("") : '<div class="empty">登録されている予定はありません。</div>')
+   + (upcoming.length ? upcoming.map(ev=>'<div class="listrow"><div><strong>'+esc(ev.title)+'</strong><div class="card-meta">'+esc(ev.date)+' ／ '+esc(ev.type||"")+(ev.memo? ' ／ '+esc(ev.memo):'')+'</div><div style="margin-top:6px">'+evActions(ev)+'</div></div><span class="tag">'+esc(ev.type||"その他")+'</span></div>').join("") : '<div class="empty">登録されている予定はありません。</div>')
   + '</section>'
   + '<section class="panel"><h3>予定を追加</h3><div class="formgrid">'
   + '<div class="field"><label>日付</label><input id="evDate" type="date" value="'+today+'"></div>'
@@ -546,6 +563,7 @@ function renderCalendar(){
   document.getElementById("calPrev").onclick=()=>{ calCursor = m===0? {y:y-1,m:11}:{y,m:m-1}; renderCalendar(); };
   document.getElementById("calNext").onclick=()=>{ calCursor = m===11? {y:y+1,m:0}:{y,m:m+1}; renderCalendar(); };
   $app.querySelectorAll("[data-cfmt]").forEach(b=>b.onclick=()=>{ calZemiFmt=b.dataset.cfmt; renderCalendar(); });
+  $app.querySelectorAll("[data-day]").forEach(c=>c.onclick=()=>{ calSel=c.dataset.day; renderCalendar(); });
   document.getElementById("evSubmit").onclick=()=>{
     if(!requireUser()) return;
     const title = document.getElementById("evTitle").value.trim();

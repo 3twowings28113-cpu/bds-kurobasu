@@ -192,3 +192,5 @@ main{ max-width:1060px; margin:0 auto; padding:0 16px 90px }
   .thread-form{ flex-direction:column }
 }
 .lmsline{ display:block; margin-top:5px }
+.cal-cell{ cursor:pointer }
+.cal-cell.sel{ border-color:var(--wine); box-shadow:inset 0 0 0 2px var(--wine); background:#FDF6FA }
