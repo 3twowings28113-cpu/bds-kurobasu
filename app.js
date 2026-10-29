@@ -528,6 +528,19 @@ function renderCalendar(){
     cells += '<div class="cal-cell'+(ds===today?" today":"")+(ds===calSel?" sel":"")+'" data-day="'+ds+'"><span class="cal-d">'+d+'</span>'+evs.slice(0,3).map(ev=>'<span class="cal-ev '+esc(ev.type||"その他")+'">'+esc(ev.short || ev.title)+'</span>').join("")+(evs.length>3? '<span class="cal-ev more">他'+(evs.length-3)+'件</span>':'')+'</div>';
   }
   const upcoming = allEvents().filter(ev=>ev.date>=today).sort((a,b)=>a.date<b.date?-1:1).slice(0,14);
+  const todayEvs = byDay[today] || [];
+  const todayStrip = '<div class="todaystrip"><span class="ts-label">今日の予定</span>'
+    + (todayEvs.length ? todayEvs.map(ev=>{
+        const tm = (ev.memo || "").match(/\d{1,2}:\d{2}[^\s／]*/);
+        const label = (ev.short || ev.title) + (tm ? " " + tm[0] : "");
+        if(ev.title.indexOf("ゼミ説明会: ") === 0){ const z = ZEMI.find(x=>x.teacher === ev.title.slice(6)); if(z) return '<a class="ts-chip" href="#/zemi/' + z.id + '">' + esc(label) + '</a>'; }
+        return '<button class="ts-chip" data-selday="' + today + '">' + esc(label) + '</button>';
+      }).join("") : '<span class="dim">今日の予定はありません</span>')
+    + '</div>';
+  const selLabel = calSel === today ? "今日の予定" : calSel + " の予定";
+  const dayPanel = '<section class="panel" id="dayPanel"><h3>' + esc(selLabel) + '</h3>'
+    + ((byDay[calSel] || []).length ? (byDay[calSel] || []).map(ev=>'<div class="listrow"><div><strong>'+esc(ev.title)+'</strong><div class="card-meta">'+esc(ev.type||"")+(ev.memo? ' / '+esc(ev.memo):'')+'</div><div style="margin-top:6px">'+evActions(ev)+'</div></div></div>').join("") : '<div class="empty">この日の予定はありません。日付をタップするとその日の予定が見られます。</div>')
+    + '</section>';
   const zemiSchedule = '<section class="panel"><h3>ゼミ説明会・オンデマンド一覧</h3>'
   + '<p class="note">全ゼミの説明会日程とオンデマンド動画URLの一覧です。ボタンで形式ごとに絞り込めます。</p>'
   + '<div class="quickchips" style="margin:6px 0 4px">'+ZFORMATS.map(function(pr){ return '<button class="qchip '+(calZemiFmt===pr[0]?"on":"")+'" data-cfmt="'+pr[0]+'">'+pr[1]+'</button>'; }).join("")+'</div>'
@@ -544,12 +557,11 @@ function renderCalendar(){
   $app.innerHTML =
   '<h2 class="sec"><span class="sec-en">CALENDAR</span>みんなのカレンダー</h2>'
   + '<p class="sec-note">テスト日、ゼミ説明会、レポート締切など、みんなで追加していくカレンダーです。</p>'
+  + todayStrip
   + '<div class="cal-head"><button class="btn small ghost" id="calPrev">← 前の月</button><h3>'+y+'年'+(m+1)+'月</h3><button class="btn small ghost" id="calNext">次の月 →</button></div>'
   + '<div class="cal-grid"><div class="cal-w">日</div><div class="cal-w">月</div><div class="cal-w">火</div><div class="cal-w">水</div><div class="cal-w">木</div><div class="cal-w">金</div><div class="cal-w">土</div>'+cells+'</div>'
+  + dayPanel
   + zemiSchedule
-  + '<section class="panel"><h3>'+esc(calSel)+' の予定</h3>'
-  + ((byDay[calSel] || []).length ? (byDay[calSel] || []).map(ev=>'<div class="listrow"><div><strong>'+esc(ev.title)+'</strong><div class="card-meta">'+esc(ev.type||"")+(ev.memo? ' ／ '+esc(ev.memo):'')+'</div><div style="margin-top:6px">'+evActions(ev)+'</div></div></div>').join("") : '<div class="empty">この日の予定はありません。日付をタップするとその日の予定が見られます。</div>')
-  + '</section>'
   + '<section class="panel"><h3>これからの予定</h3>'
    + (upcoming.length ? upcoming.map(ev=>'<div class="listrow"><div><strong>'+esc(ev.title)+'</strong><div class="card-meta">'+esc(ev.date)+' ／ '+esc(ev.type||"")+(ev.memo? ' ／ '+esc(ev.memo):'')+'</div><div style="margin-top:6px">'+evActions(ev)+'</div></div><span class="tag">'+esc(ev.type||"その他")+'</span></div>').join("") : '<div class="empty">登録されている予定はありません。</div>')
   + '</section>'
@@ -563,7 +575,8 @@ function renderCalendar(){
   document.getElementById("calPrev").onclick=()=>{ calCursor = m===0? {y:y-1,m:11}:{y,m:m-1}; renderCalendar(); };
   document.getElementById("calNext").onclick=()=>{ calCursor = m===11? {y:y+1,m:0}:{y,m:m+1}; renderCalendar(); };
   $app.querySelectorAll("[data-cfmt]").forEach(b=>b.onclick=()=>{ calZemiFmt=b.dataset.cfmt; renderCalendar(); });
-  $app.querySelectorAll("[data-day]").forEach(c=>c.onclick=()=>{ calSel=c.dataset.day; renderCalendar(); });
+  $app.querySelectorAll("[data-day]").forEach(c=>c.onclick=()=>{ calSel=c.dataset.day; renderCalendar(); const p=document.getElementById("dayPanel"); if(p) p.scrollIntoView({behavior:"smooth", block:"start"}); });
+  $app.querySelectorAll("[data-selday]").forEach(c=>c.onclick=()=>{ calSel=c.dataset.selday; renderCalendar(); const p=document.getElementById("dayPanel"); if(p) p.scrollIntoView({behavior:"smooth", block:"start"}); });
   document.getElementById("evSubmit").onclick=()=>{
     if(!requireUser()) return;
     const title = document.getElementById("evTitle").value.trim();
