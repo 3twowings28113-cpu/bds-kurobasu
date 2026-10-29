@@ -134,7 +134,8 @@ let coursePage = 1;
 let selectedTeacherIdx = 0;
 let courseTab = "syllabus";
 let zemiTab = "about";
-let zemiFilter = { q:"", tag:"" };
+let zemiFilter = { q:"", tag:"", fmt:"" };
+let calZemiFmt = "";
 let bookFilter = "all";
 let openThreadId = null;
 let calCursor = (()=>{ const d=new Date(); return {y:d.getFullYear(), m:d.getMonth()}; })();
@@ -370,11 +371,35 @@ function renderCourseDetail(name, tab){
 }
 
 /* ---------- zemi ---------- */
+const ZFORMATS = [["","すべて"],["ondemand","オンデマンド資料あり"],["live","リアルタイム配信"],["inperson","対面のみ"],["none","説明会なし"]];
+function zemiFormats(z){
+  const info = zemiInfo[z.id] || {};
+  const ond = info.ondemand ?? z.ondemand ?? "";
+  const brief = info.briefing ?? z.briefing ?? "";
+  const f = [];
+  if(ond.startsWith("http")) f.push("ondemand");
+  if((ond + brief).includes("リアルタイム")) f.push("live");
+  if(ond.includes("対面のみ")) f.push("inperson");
+  if(brief === "説明会なし" || ond.includes("メッセージのみ")) f.push("none");
+  return f;
+}
+function fmtBadges(z){
+  const f = zemiFormats(z); const out = [];
+  if(f.includes("ondemand")) out.push('<span class="tag ok">オンデマンド資料あり</span>');
+  if(f.includes("live")) out.push('<span class="tag">リアルタイム配信</span>');
+  if(f.includes("inperson")) out.push('<span class="tag">対面のみ</span>');
+  if(f.includes("none")) out.push('<span class="tag">説明会なし</span>');
+  return out.length ? '<p class="card-tags">' + out.join("") + '</p>' : '';
+}
+function linkifyBrief(t){
+  return esc(t).replace(/https?:\/\/[^\s<]+/g, function(u){ return '<a href="' + u + '" target="_blank" rel="noopener">リンク</a>'; });
+}
 function renderZemi(){
   const tags = [...new Set(ZEMI.flatMap(z=>z.tags||[]))];
   const list = ZEMI.filter(z=>{
     if(zemiFilter.q){ const q=zemiFilter.q.toLowerCase(); if(!(z.teacher.toLowerCase().includes(q)||(z.field||"").toLowerCase().includes(q)||(z.intro||"").toLowerCase().includes(q))) return false; }
     if(zemiFilter.tag && !(z.tags||[]).includes(zemiFilter.tag)) return false;
+    if(zemiFilter.fmt && !zemiFormats(z).includes(zemiFilter.fmt)) return false;
     return true;
   });
   $app.innerHTML =
@@ -382,8 +407,11 @@ function renderZemi(){
   + '<p class="sec-note">BDS学部のゼミ（専門演習）'+ZEMI.length+'件。研究分野は学部パンフレット2026から。説明会の日程・オンデマンド動画は分かった人が各ゼミのページで追加できます。</p>'
   + '<div class="filters"><div class="row">'
   + '<div class="field" style="flex:1;min-width:200px"><label>キーワード（先生・研究分野）</label><input type="text" id="zQ" value="'+esc(zemiFilter.q)+'" placeholder="例: 機械学習、マーケティング"></div>'
-  + '<div class="field"><label>タグ</label><select id="zTag"><option value="">すべて</option>'+tags.map(t=>'<option '+(zemiFilter.tag===t?"selected":"")+'>'+esc(t)+'</option>').join("")+'</select></div>'
-  + '</div></div>'
+  + '</div>'
+  + '<div class="quickchips" style="margin-top:10px">'+ZFORMATS.map(function(pr){ return '<button class="qchip '+(zemiFilter.fmt===pr[0]?"on":"")+'" data-zfmt="'+pr[0]+'">'+pr[1]+'</button>'; }).join("")+'</div>'
+  + '<div class="quickchips">'+[""].concat(tags).map(function(t){ return '<button class="qchip '+(zemiFilter.tag===t?"on":"")+'" data-ztag="'+esc(t)+'">'+(t || "ジャンル: すべて")+'</button>'; }).join("")+'</div>'
+  + '</div>'
+  + '<p class="sec-note">'+list.length+'件のゼミが見つかりました</p>'
   + '<div class="grid">'+ list.map(z=>{
       const info = zemiInfo[z.id] || {};
       const brief = info.briefing || z.briefing || "";
@@ -392,14 +420,16 @@ function renderZemi(){
       + '<p class="card-meta">'+esc(z.title||"")+' ／ '+esc(z.field||"")+(posts? ' ／ 書き込み'+posts+'件':'')+'</p>'
       + '<p class="card-d">'+esc(z.intro||"")+'</p>'
       + '<p class="card-tags">'+(z.tags||[]).map(t=>'<span class="tag">'+esc(t)+'</span>').join("")+'</p>'
-      + '<p class="card-meta">'+(brief? '説明会: '+esc(brief) : '説明会: <span class="dim">情報募集中</span>')+'</p></article>';
+      + fmtBadges(z)
+      + '<p class="card-meta">'+(brief? '説明会: '+linkifyBrief(brief) : '説明会: <span class="dim">情報募集中</span>')+'</p></article>';
     }).join("") +'</div>';
-  document.getElementById("zTag").onchange=e=>{ zemiFilter.tag=e.target.value; renderZemi(); };
+  $app.querySelectorAll("[data-zfmt]").forEach(b=>b.onclick=()=>{ zemiFilter.fmt=b.dataset.zfmt; renderZemi(); });
+  $app.querySelectorAll("[data-ztag]").forEach(b=>b.onclick=()=>{ zemiFilter.tag=b.dataset.ztag; renderZemi(); });
   document.getElementById("zQ").addEventListener("keydown",e=>{ if(e.key==="Enter"){ zemiFilter.q=e.target.value; renderZemi(); } });
 }
 function lmsLinkHtml(url, label, compact){
   if(url.includes("kulms")){
-    if(compact) return '<a class="btn small" data-track="lms" data-label="'+esc(label || "LMS資料")+'" href="'+esc(url)+'" target="_blank" rel="noopener">LMS資料を開く</a> <span class="dim">(未ログイン時は先にLMSログイン)</span>';
+    if(compact) return '<span class="lmsline"><a class="btn small" data-track="lms" data-label="'+esc(label || "LMS資料")+'" href="'+esc(url)+'" target="_blank" rel="noopener">LMS資料を開く</a> <span class="dim">(要LMSログイン)</span></span>';
     return '<span class="lmsbox"><a class="btn ghost" href="https://kulms.tl.kansai-u.ac.jp/webclass/" target="_blank" rel="noopener">1. LMSにログイン</a> <a class="btn" data-track="lms" data-label="'+esc(label || "LMS資料")+'" href="'+esc(url)+'" target="_blank" rel="noopener">2. 資料を開く</a><br><span class="dim">LMSは未ログインで開くと、ログイン後にトップへ戻ってしまいます。先にログインしてから「2. 資料を開く」を押してください（ログイン済みなら2だけでOK）</span></span>';
   }
   return '<a href="'+esc(url)+'" target="_blank" rel="noopener">'+esc(url)+'</a>';
@@ -420,7 +450,7 @@ function renderZemiDetail(id, tab){
     + '<div class="kv"><span>研究分野</span><p>'+esc(z.field||"")+'</p></div>'
     + '<div class="kv"><span>タグ</span><p>'+(z.tags||[]).map(t=>'<span class="tag">'+esc(t)+'</span>').join(" ")+'</p></div>'
     + '<div class="kv"><span>紹介</span><p class="pre">'+esc(z.intro||"")+'</p></div>'
-    + '<div class="kv"><span>説明会</span><p>'+(brief? esc(brief) : '<span class="dim">情報募集中（「説明会・動画」タブから追加できます）</span>')+'</p></div>'
+    + '<div class="kv"><span>説明会</span><p>'+(brief? linkifyBrief(brief) : '<span class="dim">情報募集中（「説明会・動画」タブから追加できます）</span>')+'</p></div>'
     + '<div class="kv"><span>オンデマンド</span><p>'+(ond? (ond.startsWith("http")? lmsLinkHtml(ond, "ゼミ資料: " + z.teacher) : esc(ond)) : '<span class="dim">情報募集中</span>')+'</p></div>'
     + '</section>';
   }
@@ -483,13 +513,14 @@ function renderCalendar(){
   }
   const upcoming = events.filter(ev=>ev.date>=today).sort((a,b)=>a.date<b.date?-1:1).slice(0,10);
   const zemiSchedule = '<section class="panel"><h3>ゼミ説明会・オンデマンド一覧</h3>'
-  + '<p class="note">全ゼミの説明会日程とオンデマンド動画URLの一覧です。分かった人が各ゼミの「説明会・動画」タブから追加・更新できます。</p>'
-  + ZEMI.map(z=>{
+  + '<p class="note">全ゼミの説明会日程とオンデマンド動画URLの一覧です。ボタンで形式ごとに絞り込めます。</p>'
+  + '<div class="quickchips" style="margin:6px 0 4px">'+ZFORMATS.map(function(pr){ return '<button class="qchip '+(calZemiFmt===pr[0]?"on":"")+'" data-cfmt="'+pr[0]+'">'+pr[1]+'</button>'; }).join("")+'</div>'
+  + ZEMI.filter(z=>!calZemiFmt || zemiFormats(z).includes(calZemiFmt)).map(z=>{
       const info = zemiInfo[z.id] || {};
       const brief = info.briefing ?? z.briefing ?? "";
       const ond = info.ondemand ?? z.ondemand ?? "";
       return '<div class="listrow"><div><a href="#/zemi/'+esc(z.id)+'"><strong>'+esc(z.teacher)+' ゼミ</strong></a>'
-      + '<div class="card-meta">説明会: '+(brief? esc(brief) : '<span class="dim">情報募集中</span>')
+      + '<div class="card-meta">説明会: '+(brief? linkifyBrief(brief) : '<span class="dim">情報募集中</span>')
       + '<br>オンデマンド: '+(ond? (ond.startsWith("http")? lmsLinkHtml(ond, "ゼミ資料: " + z.teacher, true) : esc(ond)) : '<span class="dim">情報募集中</span>')+'</div></div>'
       + '<a class="btn small ghost" href="#/zemi/'+esc(z.id)+'/info">追加・編集</a></div>';
     }).join("")
@@ -512,6 +543,7 @@ function renderCalendar(){
   calPresetTitle = "";
   document.getElementById("calPrev").onclick=()=>{ calCursor = m===0? {y:y-1,m:11}:{y,m:m-1}; renderCalendar(); };
   document.getElementById("calNext").onclick=()=>{ calCursor = m===11? {y:y+1,m:0}:{y,m:m+1}; renderCalendar(); };
+  $app.querySelectorAll("[data-cfmt]").forEach(b=>b.onclick=()=>{ calZemiFmt=b.dataset.cfmt; renderCalendar(); });
   document.getElementById("evSubmit").onclick=()=>{
     if(!requireUser()) return;
     const title = document.getElementById("evTitle").value.trim();
