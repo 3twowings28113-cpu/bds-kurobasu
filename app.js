@@ -149,6 +149,11 @@ function gcalUrl(ev){
   const d2 = nx.getFullYear() + String(nx.getMonth() + 1).padStart(2, "0") + String(nx.getDate()).padStart(2, "0");
   return "https://calendar.google.com/calendar/render?action=TEMPLATE&text=" + encodeURIComponent(ev.title) + "&dates=" + d + "/" + d2 + "&details=" + encodeURIComponent((ev.memo || "") + " (BDSクロバス)");
 }
+function evInpersonTag(ev){
+  if(ev.title.indexOf("ゼミ説明会: ") !== 0) return "";
+  const z = ZEMI.find(x=>x.teacher === ev.title.slice(6));
+  return (z && zemiFormats(z).includes("inperson")) ? ' <span class="tag inperson">対面のみ</span>' : "";
+}
 function evActions(ev){
   let zid = "";
   if(ev.title.indexOf("ゼミ説明会: ") === 0){ const t = ev.title.slice(6); const z = ZEMI.find(x=>x.teacher === t); if(z) zid = z.id; }
@@ -430,7 +435,7 @@ function fmtBadges(z){
   const f = zemiFormats(z); const out = [];
   if(f.includes("ondemand")) out.push('<span class="tag ok">オンデマンド資料あり</span>');
   if(f.includes("live")) out.push('<span class="tag">リアルタイム配信</span>');
-  if(f.includes("inperson")) out.push('<span class="tag">対面のみ</span>');
+  if(f.includes("inperson")) out.push('<span class="tag inperson">対面のみ（オンラインなし）</span>');
   if(f.includes("none")) out.push('<span class="tag">説明会なし</span>');
   return out.length ? '<p class="card-tags">' + out.join("") + '</p>' : '';
 }
@@ -517,6 +522,7 @@ function renderZemiDetail(id, tab){
   '<p class="crumb"><a href="#/zemi">← ゼミ一覧に戻る</a></p>'
   + '<h2 class="detail-title">'+esc(z.teacher)+' ゼミ</h2>'
   + '<p class="sec-note">'+esc(z.title||"")+' ／ '+esc(z.field||"")+'</p>'
+  + (zemiFormats(z).includes("inperson") ? '<div class="inperson-banner">対面のみ：オンデマンド動画もオンライン配信もありません。行ける日程は逃さないようにしてください。</div>' : '')
   + '<div class="tabbar">'+tabBtn("about","ゼミ情報")+tabBtn("posts","書き込み（"+posts.length+"）")+tabBtn("info","説明会・動画")+'</div>'
   + body;
   $app.querySelectorAll("[data-ztab]").forEach(b=>b.onclick=()=>{ navTo("#/zemi/"+id+"/"+b.dataset.ztab); });
@@ -560,14 +566,16 @@ function renderCalendar(){
   const todayStrip = '<div class="todaystrip"><span class="ts-label">今日の予定</span>'
     + (todayEvs.length ? todayEvs.map(ev=>{
         const tm = (ev.memo || "").match(/\d{1,2}:\d{2}[^\s／]*/);
-        const label = (ev.short || ev.title) + (tm ? " " + tm[0] : "");
-        if(ev.title.indexOf("ゼミ説明会: ") === 0){ const z = ZEMI.find(x=>x.teacher === ev.title.slice(6)); if(z) return '<a class="ts-chip" href="#/zemi/' + z.id + '">' + esc(label) + '</a>'; }
+        let label = (ev.short || ev.title) + (tm ? " " + tm[0] : "");
+        const zz = ev.title.indexOf("ゼミ説明会: ") === 0 ? ZEMI.find(x=>x.teacher === ev.title.slice(6)) : null;
+        if(zz && zemiFormats(zz).includes("inperson")) label += "・対面のみ";
+        if(zz) return '<a class="ts-chip" href="#/zemi/' + zz.id + '">' + esc(label) + '</a>';
         return '<button class="ts-chip" data-selday="' + today + '">' + esc(label) + '</button>';
       }).join("") : '<span class="dim">今日の予定はありません</span>')
     + '</div>';
   const selLabel = calSel === today ? "今日の予定" : calSel + " の予定";
   const dayPanel = '<section class="panel" id="dayPanel"><h3>' + esc(selLabel) + '</h3>'
-    + ((byDay[calSel] || []).length ? (byDay[calSel] || []).map(ev=>'<div class="listrow"><div><strong>'+esc(ev.title)+'</strong><div class="card-meta">'+esc(ev.type||"")+(ev.memo? ' / '+esc(ev.memo):'')+'</div><div style="margin-top:6px">'+evActions(ev)+'</div></div></div>').join("") : '<div class="empty">この日の予定はありません。日付をタップするとその日の予定が見られます。</div>')
+    + ((byDay[calSel] || []).length ? (byDay[calSel] || []).map(ev=>'<div class="listrow"><div><strong>'+esc(ev.title)+'</strong>'+evInpersonTag(ev)+'<div class="card-meta">'+esc(ev.type||"")+(ev.memo? ' / '+esc(ev.memo):'')+'</div><div style="margin-top:6px">'+evActions(ev)+'</div></div></div>').join("") : '<div class="empty">この日の予定はありません。日付をタップするとその日の予定が見られます。</div>')
     + '</section>';
   const zemiSchedule = '<section class="panel"><h3>ゼミ説明会・オンデマンド一覧</h3>'
   + '<p class="note">全ゼミの説明会日程とオンデマンド動画URLの一覧です。ボタンで形式ごとに絞り込めます。</p>'
@@ -576,7 +584,7 @@ function renderCalendar(){
       const info = zemiInfo[z.id] || {};
       const brief = info.briefing ?? z.briefing ?? "";
       const ond = info.ondemand ?? z.ondemand ?? "";
-      return '<div class="listrow"><div><a href="#/zemi/'+esc(z.id)+'"><strong>'+esc(z.teacher)+' ゼミ</strong></a>'
+      return '<div class="listrow"><div><a href="#/zemi/'+esc(z.id)+'"><strong>'+esc(z.teacher)+' ゼミ</strong></a>'+(zemiFormats(z).includes("inperson") ? ' <span class="tag inperson">対面のみ</span>' : '')
       + '<div class="card-meta">説明会: '+(brief? linkifyBrief(brief) : '<span class="dim">情報募集中</span>')
       + '<br>オンデマンド: '+(ond? (ond.startsWith("http")? lmsLinkHtml(ond, "ゼミ資料: " + z.teacher, true) : esc(ond)) : '<span class="dim">情報募集中</span>')+'</div></div>'
       + '<a class="btn small ghost" href="#/zemi/'+esc(z.id)+'/info">追加・編集</a></div>';
@@ -591,7 +599,7 @@ function renderCalendar(){
   + dayPanel
   + zemiSchedule
   + '<section class="panel"><h3>これからの予定</h3>'
-   + (upcoming.length ? upcoming.map(ev=>'<div class="listrow"><div><strong>'+esc(ev.title)+'</strong><div class="card-meta">'+esc(ev.date)+' ／ '+esc(ev.type||"")+(ev.memo? ' ／ '+esc(ev.memo):'')+'</div><div style="margin-top:6px">'+evActions(ev)+'</div></div><span class="tag">'+esc(ev.type||"その他")+'</span></div>').join("") : '<div class="empty">登録されている予定はありません。</div>')
+   + (upcoming.length ? upcoming.map(ev=>'<div class="listrow"><div><strong>'+esc(ev.title)+'</strong>'+evInpersonTag(ev)+'<div class="card-meta">'+esc(ev.date)+' ／ '+esc(ev.type||"")+(ev.memo? ' ／ '+esc(ev.memo):'')+'</div><div style="margin-top:6px">'+evActions(ev)+'</div></div><span class="tag">'+esc(ev.type||"その他")+'</span></div>').join("") : '<div class="empty">登録されている予定はありません。</div>')
   + '</section>'
   + '<section class="panel"><h3>予定を追加</h3><div class="formgrid">'
   + '<div class="field"><label>日付</label><input id="evDate" type="date" value="'+today+'"></div>'

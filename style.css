@@ -208,3 +208,5 @@ body{ touch-action:manipulation }
 .abscount{ font-size:26px; font-weight:900; color:var(--wine-dark) }
 .abscount.small{ font-size:18px }
 .tag.warn{ background:#FDECEC; color:#B02A2A; border-color:#E5A3A3 }
+.tag.inperson{ background:#FDECEC; color:#B02A2A; border:1.5px solid #D64545; font-weight:900 }
+.inperson-banner{ background:#FDECEC; border:1.5px solid #D64545; color:#8F1D1D; border-radius:10px; padding:10px 12px; font-weight:700; font-size:13.5px; margin:10px 0 2px }
