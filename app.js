@@ -151,17 +151,17 @@ function gcalUrl(ev){
 }
 function evIsInperson(ev){
   if(ev.title.indexOf("ゼミ説明会: ") !== 0) return false;
-  const z = ZEMI.find(x=>x.teacher === ev.title.slice(6));
+  const z = ZEMI.find(x=>x.teacher === ev.title.slice(7));
   return !!(z && zemiFormats(z).includes("inperson"));
 }
 function evInpersonTag(ev){
   if(ev.title.indexOf("ゼミ説明会: ") !== 0) return "";
-  const z = ZEMI.find(x=>x.teacher === ev.title.slice(6));
+  const z = ZEMI.find(x=>x.teacher === ev.title.slice(7));
   return (z && zemiFormats(z).includes("inperson")) ? ' <span class="tag inperson">対面のみ</span>' : "";
 }
 function evActions(ev){
   let zid = "";
-  if(ev.title.indexOf("ゼミ説明会: ") === 0){ const t = ev.title.slice(6); const z = ZEMI.find(x=>x.teacher === t); if(z) zid = z.id; }
+  if(ev.title.indexOf("ゼミ説明会: ") === 0){ const t = ev.title.slice(7); const z = ZEMI.find(x=>x.teacher === t); if(z) zid = z.id; }
   return (zid ? '<a class="btn small ghost" href="#/zemi/' + zid + '">ゼミの情報を見る</a> ' : '')
     + '<a class="btn small ghost" href="' + gcalUrl(ev) + '" target="_blank" rel="noopener">Googleカレンダーに追加</a>';
 }
@@ -572,7 +572,7 @@ function renderCalendar(){
     + (todayEvs.length ? todayEvs.map(ev=>{
         const tm = (ev.memo || "").match(/\d{1,2}:\d{2}[^\s／]*/);
         let label = (ev.short || ev.title) + (tm ? " " + tm[0] : "");
-        const zz = ev.title.indexOf("ゼミ説明会: ") === 0 ? ZEMI.find(x=>x.teacher === ev.title.slice(6)) : null;
+        const zz = ev.title.indexOf("ゼミ説明会: ") === 0 ? ZEMI.find(x=>x.teacher === ev.title.slice(7)) : null;
         if(zz && zemiFormats(zz).includes("inperson")) label += "・対面のみ";
         if(zz) return '<a class="ts-chip' + (zemiFormats(zz).includes("inperson") ? " inp" : "") + '" href="#/zemi/' + zz.id + '">' + esc(label) + '</a>';
         return '<button class="ts-chip" data-selday="' + today + '">' + esc(label) + '</button>';
