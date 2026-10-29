@@ -149,6 +149,11 @@ function gcalUrl(ev){
   const d2 = nx.getFullYear() + String(nx.getMonth() + 1).padStart(2, "0") + String(nx.getDate()).padStart(2, "0");
   return "https://calendar.google.com/calendar/render?action=TEMPLATE&text=" + encodeURIComponent(ev.title) + "&dates=" + d + "/" + d2 + "&details=" + encodeURIComponent((ev.memo || "") + " (BDSクロバス)");
 }
+function evIsInperson(ev){
+  if(ev.title.indexOf("ゼミ説明会: ") !== 0) return false;
+  const z = ZEMI.find(x=>x.teacher === ev.title.slice(6));
+  return !!(z && zemiFormats(z).includes("inperson"));
+}
 function evInpersonTag(ev){
   if(ev.title.indexOf("ゼミ説明会: ") !== 0) return "";
   const z = ZEMI.find(x=>x.teacher === ev.title.slice(6));
@@ -559,7 +564,7 @@ function renderCalendar(){
   for(let d=1; d<=days; d++){
     const ds = y+"-"+String(m+1).padStart(2,"0")+"-"+String(d).padStart(2,"0");
     const evs = byDay[ds] || [];
-    cells += '<div class="cal-cell'+(ds===today?" today":"")+(ds===calSel?" sel":"")+'" data-day="'+ds+'"><span class="cal-d">'+d+'</span>'+evs.slice(0,3).map(ev=>'<span class="cal-ev '+esc(ev.type||"その他")+'">'+esc(ev.short || ev.title)+'</span>').join("")+(evs.length>3? '<span class="cal-ev more">他'+(evs.length-3)+'件</span>':'')+'</div>';
+    cells += '<div class="cal-cell'+(ds===today?" today":"")+(ds===calSel?" sel":"")+'" data-day="'+ds+'"><span class="cal-d">'+d+'</span>'+evs.slice(0,3).map(ev=>'<span class="cal-ev '+esc(ev.type||"その他")+(evIsInperson(ev)?" inp":"")+'">'+esc(ev.short || ev.title)+'</span>').join("")+(evs.length>3? '<span class="cal-ev more'+(evs.slice(3).some(evIsInperson)?" inp":"")+'">他'+(evs.length-3)+'件</span>':'')+'</div>';
   }
   const upcoming = allEvents().filter(ev=>ev.date>=today).sort((a,b)=>a.date<b.date?-1:1).slice(0,14);
   const todayEvs = byDay[today] || [];
@@ -569,7 +574,7 @@ function renderCalendar(){
         let label = (ev.short || ev.title) + (tm ? " " + tm[0] : "");
         const zz = ev.title.indexOf("ゼミ説明会: ") === 0 ? ZEMI.find(x=>x.teacher === ev.title.slice(6)) : null;
         if(zz && zemiFormats(zz).includes("inperson")) label += "・対面のみ";
-        if(zz) return '<a class="ts-chip" href="#/zemi/' + zz.id + '">' + esc(label) + '</a>';
+        if(zz) return '<a class="ts-chip' + (zemiFormats(zz).includes("inperson") ? " inp" : "") + '" href="#/zemi/' + zz.id + '">' + esc(label) + '</a>';
         return '<button class="ts-chip" data-selday="' + today + '">' + esc(label) + '</button>';
       }).join("") : '<span class="dim">今日の予定はありません</span>')
     + '</div>';
