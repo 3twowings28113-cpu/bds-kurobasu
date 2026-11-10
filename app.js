@@ -160,11 +160,14 @@ function showGate(){
   const del = document.getElementById("gateDelete");
   if(del) del.onclick = () => { localStorage.removeItem("bds_user"); user=null; $modal.innerHTML=""; renderUserbox(); toast("登録情報を消しました"); route(); };
 }
+const NO_REG_UNTIL = new Date("2026-11-12T17:00:00+09:00").getTime();
+function noRegOpen(){ return Date.now() < NO_REG_UNTIL; }
+function byName(){ return user ? user.name + "（" + user.grade + "回生）" : "匿名の学生"; }
 function requireUser(){
-  if(user && user.enrollYear && user.gradYear) return true;
-  if(user){ showGate(); toast("入学年度・卒業年度の登録をお願いします"); return false; }
-  showGate();
-  toast("投稿するには学生登録が必要です");
+  if(user) return true;
+  if(noRegOpen()) return true;
+  toast("先に学生登録をしてください（名前と学年だけ）");
+  openRegister();
   return false;
 }
 
@@ -273,6 +276,9 @@ function route(){
   else if(p[0]==="reviews"){ setNav("reviews"); renderReviews(); }
   else if(p[0]==="mypage"){ setNav("mypage"); renderMypage(); }
   else { setNav("home"); renderHome(); }
+  if(noRegOpen() && !user && ["zemi","course","reviews","board","books"].includes(p[0])){
+    $app.insertAdjacentHTML("afterbegin", '<div class="noreg">🎓 期間限定（11/12 17:00まで）学生登録なしで投稿できます</div>');
+  }
 }
 window.addEventListener("hashchange", route);
 document.querySelector(".brand").addEventListener("click", e => { e.preventDefault(); navTo("#/"); });
@@ -489,7 +495,7 @@ function renderCourseDetail(name, tab){
     document.getElementById("rSubmit").onclick=()=>{
       if(!requireUser()) return;
       if(!rv.overall){ toast("総合評価の星を選んでください"); return; }
-      (reviews[c.id] = reviews[c.id] || []).unshift({ overall:rv.overall, easy:rv.easy||"", rich:rv.rich||"", skip:rv.skip||"", heavy:rv.heavy||"", body:document.getElementById("rBody").value.trim(), by:user.name+"（"+user.grade+"回生）", date:todayStr() });
+      (reviews[c.id] = reviews[c.id] || []).unshift({ overall:rv.overall, easy:rv.easy||"", rich:rv.rich||"", skip:rv.skip||"", heavy:rv.heavy||"", body:document.getElementById("rBody").value.trim(), by:byName(), date:todayStr() });
       save("bds_reviews", reviews); toast("口コミを投稿しました"); renderCourseDetail(name, "reviews");
     };
   }
@@ -498,7 +504,7 @@ function renderCourseDetail(name, tab){
       if(!requireUser()) return;
       const memo = document.getElementById("eMemo").value.trim();
       if(!memo){ toast("傾向メモを書いてください"); return; }
-      (exams[c.id] = exams[c.id] || []).unshift({ year:document.getElementById("eYear").value.trim(), kind:document.getElementById("eKind").value, memo, link:document.getElementById("eLink").value.trim(), by:user.name+"（"+user.grade+"回生）", date:todayStr() });
+      (exams[c.id] = exams[c.id] || []).unshift({ year:document.getElementById("eYear").value.trim(), kind:document.getElementById("eKind").value, memo, link:document.getElementById("eLink").value.trim(), by:byName(), date:todayStr() });
       save("bds_exams", exams); toast("過去問情報を追加しました"); renderCourseDetail(name, "exams");
     };
   }
@@ -738,7 +744,7 @@ function renderZemiDetail(id, tab){
   if(zemiTab==="info"){
     document.getElementById("ziSubmit").onclick=()=>{
       if(!requireUser()) return;
-      zemiInfo[id] = { briefing:document.getElementById("ziBrief").value.trim(), ondemand:document.getElementById("ziOnd").value.trim(), by:user.name, date:todayStr() };
+      zemiInfo[id] = { briefing:document.getElementById("ziBrief").value.trim(), ondemand:document.getElementById("ziOnd").value.trim(), by:(user ? user.name : "匿名の学生"), date:todayStr() };
       save("bds_zemi_info", zemiInfo); toast("保存しました"); renderZemiDetail(id, "about");
     };
   }
@@ -820,7 +826,7 @@ function renderCalendar(){
     const title = document.getElementById("evTitle").value.trim();
     const date = document.getElementById("evDate").value;
     if(!title || !date){ toast("日付とタイトルを入れてください"); return; }
-    events.push({ id:"ev"+Date.now(), title, date, type:document.getElementById("evType").value, memo:document.getElementById("evMemo").value.trim(), by:user.name });
+    events.push({ id:"ev"+Date.now(), title, date, type:document.getElementById("evType").value, memo:document.getElementById("evMemo").value.trim(), by:(user ? user.name : "匿名の学生") });
     save("bds_events", events); toast("カレンダーに追加しました"); renderCalendar();
   };
 }
@@ -877,7 +883,7 @@ function renderBooks(){
     if(!text){ toast("メッセージを書いてください"); return; }
     const bk = books.find(x=>x.id===openThreadId); if(!bk) return;
     bk.msgs = bk.msgs || [];
-    bk.msgs.push({ name:user.name+"（"+user.grade+"回生）", text, at:todayStr() });
+    bk.msgs.push({ name:byName(), text, at:todayStr() });
     save("bds_books", books); toast("連絡を書きました"); renderBooks();
   };
   document.getElementById("bkSubmit").onclick=()=>{
@@ -892,7 +898,7 @@ function renderBooks(){
       when:document.getElementById("bkWhen").value.trim(),
       note:document.getElementById("bkNote").value.trim(),
       contact:document.getElementById("bkContact").value.trim(),
-      by:user.name, grade:user.grade, date:todayStr(), status:"open", msgs:[], createdAt:Date.now() });
+      by:(user ? user.name : "匿名の学生"), grade:(user ? user.grade : ""), date:todayStr(), status:"open", msgs:[], createdAt:Date.now() });
     save("bds_books", books); toast("投稿しました"); bookFilter="all"; renderBooks();
   };
 }
@@ -913,7 +919,7 @@ function renderBoard(){
     const title = document.getElementById("bdTitle").value.trim();
     const body = document.getElementById("bdBody").value.trim();
     if(!title || !body){ toast("タイトルと本文を書いてください"); return; }
-    board.unshift({ id:"bd"+Date.now(), cat:document.getElementById("bdCat").value, title, body, by:user.name+"（"+user.grade+"回生）", date:todayStr() });
+    board.unshift({ id:"bd"+Date.now(), cat:document.getElementById("bdCat").value, title, body, by:byName(), date:todayStr() });
     save("bds_board", board); toast("投稿しました"); renderBoard();
   };
 }
@@ -1015,7 +1021,7 @@ function renderReviews(){
     const teacher = pkCustom ? teacherCustom.value.trim() : pkTeacher;
     if(!fv.overall){ toast("総合評価の星を選んでください"); return; }
     const entry = COURSES.find(c=>c.name===nm && c.instructor===teacher) || COURSES.find(c=>c.name===nm);
-    const rv = { overall:fv.overall, easy:fv.easy||"", rich:fv.rich||"", skip:fv.skip||"", heavy:fv.heavy||"", body:document.getElementById("fBody").value.trim(), by:user.name+"（"+user.grade+"回生）", date:todayStr(), teacher:teacher || (entry ? entry.instructor : "") };
+    const rv = { overall:fv.overall, easy:fv.easy||"", rich:fv.rich||"", skip:fv.skip||"", heavy:fv.heavy||"", body:document.getElementById("fBody").value.trim(), by:byName(), date:todayStr(), teacher:teacher || (entry ? entry.instructor : "") };
     if(entry){ (reviews[entry.id] = reviews[entry.id] || []).unshift(rv); }
     else { const key = "custom:" + nm; (reviews[key] = reviews[key] || []).unshift(rv); }
     save("bds_reviews", reviews); toast("口コミを投稿しました"); renderReviews();
