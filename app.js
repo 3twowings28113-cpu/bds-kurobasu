@@ -75,7 +75,7 @@ async function sbSync(){
       const rows = vdocs.map(d=>{ const f = d.fields || {}; return { device_id: fs_id(d), f: fs_gs(f.f), s: fs_gs(f.s), t: fs_gs(f.t) }; });
       const mine = rows.find(r=>r.device_id === deviceId);
       const others = rows.filter(r=>r.device_id !== deviceId).map(r=>({ f: r.f, s: r.s, t: r.t }));
-      const myLocal = (zemiVotes || []).find(v=>v.__mine) || null;
+      const myLocal = (zemiVotes || []).find(v=>v.__mine) || ((zemiVotes || []).length === 1 ? zemiVotes[0] : null);
       if(mine) zemiVotes = [{ f: mine.f, s: mine.s, t: mine.t, __mine: true }].concat(others);
       else if(myLocal){ sbPushVote(myLocal); zemiVotes = [myLocal].concat(others); }
       else zemiVotes = others;
@@ -166,6 +166,7 @@ document.addEventListener("click", function(e){
     const it = rr[kind] = rr[kind] || {c:0, mine:false};
     if(it.mine){ it.c = Math.max(0, it.c - 1); it.mine = false; } else { it.c += 1; it.mine = true; }
     save("bds_reactions", reactions);
+    sbReact(key, kind, it.mine);
     document.querySelectorAll('[data-react="' + key + '|' + kind + '"]').forEach(function(x){
       const meta = REACTS.find(function(y){ return y[0]===kind; });
       x.classList.toggle("on", it.mine);
