@@ -588,6 +588,14 @@ function bindZemiBoard(){
     navTo("#/zemi/"+tid+"/posts");
   };
 }
+function zemiCountdownHtml(){
+  const target = new Date("2026-11-12T17:00:00+09:00").getTime();
+  const diff = target - Date.now();
+  if(diff <= 0) return '📝 ゼミ申込期間は終了しました（申込締切 11/12 17:00 ・ 結果発表は 12/22）';
+  const d = Math.floor(diff/86400000), h = Math.floor(diff%86400000/3600000), m = Math.floor(diff%3600000/60000), s = Math.floor(diff%60000/1000);
+  return '⏳ ゼミ申込締切（11/12 17:00）まで あと ' + (d>0 ? d + '日 ' : '') + h + '時間 ' + m + '分 ' + s + '秒';
+}
+setInterval(()=>{ const el = document.getElementById("zemiCountdown"); if(el) el.innerHTML = zemiCountdownHtml(); }, 1000);
 function renderZemi(){
   const tags = [...new Set(ZEMI.flatMap(z=>z.tags||[]))];
   const list = ZEMI.filter(z=>{
@@ -597,7 +605,8 @@ function renderZemi(){
     return true;
   });
   $app.innerHTML =
-  '<h2 class="sec"><span class="sec-en">SEMINAR</span>ゼミ一覧</h2>'
+  '<div class="zcd" id="zemiCountdown">' + zemiCountdownHtml() + '</div>'
+  + '<h2 class="sec"><span class="sec-en">SEMINAR</span>ゼミ一覧</h2>'
   + '<p class="sec-note">BDS学部のゼミ（専門演習）'+ZEMI.length+'件。研究分野は学部パンフレット2026から。説明会の日程・オンデマンド動画は分かった人が各ゼミのページで追加できます。</p>'
   + zemiBoardSectionHtml()
   + '<div class="filters"><div class="row">'
@@ -913,6 +922,7 @@ function renderBoard(){
 function renderReviews(){
   const all = [];
   COURSES.forEach(c=>{ (reviews[c.id]||[]).forEach(r=>all.push({c, r})); });
+  Object.keys(reviews).filter(k=>k.indexOf("custom:")===0).forEach(k=>{ (reviews[k]||[]).forEach(r=>all.push({c:{name:k.slice(7), instructor:r.teacher||"", custom:true}, r})); });
   all.sort((a,b)=>((b.r.date||"").localeCompare(a.r.date||"")));
   const ranked = COURSES.map(c=>({c, avg:avgStars(c), n:courseReviews(c).length})).filter(x=>x.n>=3 && x.avg!==null).sort((a,b)=>b.avg-a.avg).slice(0,5);
   $app.innerHTML =
@@ -920,11 +930,17 @@ function renderReviews(){
   + '<p class="sec-note">全授業の口コミの新着と、評価の高い授業です。まず読んで、書くのは一番下のフォームから。</p>'
   + (ranked.length ? '<section class="panel"><h3>評価の高い授業（口コミ3件以上）</h3>' + ranked.map(x=>'<div class="listrow"><div><a href="#/course/'+encodeURIComponent(x.c.name)+'/reviews"><strong>'+esc(x.c.name)+'</strong></a><div class="card-meta">'+esc(x.c.instructor)+' ／ 口コミ'+x.n+'件</div></div><span class="card-stars">'+stars(x.avg)+' '+x.avg.toFixed(1)+'</span></div>').join("") + '</section>' : '')
   + '<section class="panel"><h3>新着の口コミ</h3>'
-  + (all.length ? moreWrap(all.slice(0,30).map(function(it){ const r=it.r, c=it.c; const o=+(r.overall || r.easy)||0; const dims=[["取りやすさ",r.easy],["充実度",r.rich],["休みやすさ",r.skip],["課題の重さ",r.heavy]].filter(d=>+d[1]>0).map(d=>d[0]+" "+stars(+d[1])).join(" ／ "); return '<div class="post"><p class="post-head"><a href="#/course/'+encodeURIComponent(c.name)+'/reviews"><strong>'+esc(c.name)+'</strong></a>（'+esc(c.instructor)+'） <span class="revstars">'+stars(o)+'</span> 総合'+(o||"-")+(dims? ' ／ '+dims : '')+' <span>'+esc(r.by||"")+' ・ '+esc(r.date||"")+'</span></p><p>'+esc(r.body||"")+'</p>'+reactRow("rv:"+r.id)+'</div>'; }), 5, "feed") : '<div class="empty">まだ口コミがありません。下のフォームから最初の1件を書いてください。</div>')
+  + (all.length ? moreWrap(all.slice(0,30).map(function(it){ const r=it.r, c=it.c; const o=+(r.overall || r.easy)||0; const dims=[["取りやすさ",r.easy],["充実度",r.rich],["休みやすさ",r.skip],["課題の重さ",r.heavy]].filter(d=>+d[1]>0).map(d=>d[0]+" "+stars(+d[1])).join(" ／ "); return '<div class="post"><p class="post-head">'+(c.custom ? '<strong>'+esc(c.name)+'</strong>' : '<a href="#/course/'+encodeURIComponent(c.name)+'/reviews"><strong>'+esc(c.name)+'</strong></a>')+'（'+esc(r.teacher || c.instructor)+'） <span class="revstars">'+stars(o)+'</span> 総合'+(o||"-")+(dims? ' ／ '+dims : '')+' <span>'+esc(r.by||"")+' ・ '+esc(r.date||"")+'</span></p><p>'+esc(r.body||"")+'</p>'+reactRow("rv:"+r.id)+'</div>'; }), 5, "feed") : '<div class="empty">まだ口コミがありません。下のフォームから最初の1件を書いてください。</div>')
   + '</section>'
   + '<section class="panel"><h3>口コミを書く</h3><div class="formgrid">'
-  + '<div class="field"><label>授業名</label><input id="fCourse" type="text" list="courseNames" placeholder="例: AI基礎"><datalist id="courseNames">' + [...new Set(COURSES.map(c=>c.name))].map(n=>'<option value="'+esc(n)+'">').join("") + '</datalist></div>'
-  + '<div class="field"><label>先生</label><select id="fTeacher"><option value="">（先に授業名を入力）</option></select></div>'
+   + '<div class="field" style="grid-column:1/-1"><label>授業名（少し打つと候補が出ます）</label>'
+  + '<input id="fCourse" type="text" placeholder="例: AI、ビジネスアク、統計 など一部だけでもOK" autocomplete="off" style="width:100%">'
+  + '<button type="button" class="btn small ghost" id="pkFilterToggle" style="margin-top:8px">曜日・学期・ジャンルで絞る</button>'
+  + '<div id="pkFilterBody" style="display:none;margin-top:8px"></div>'
+  + '<div id="pkSuggest"></div>'
+  + '<p class="note" style="margin-top:6px">候補をタップで選択。リストにない授業は、そのまま名前を書けば新しい授業として投稿できます。</p></div>'
+  + '<div class="field" style="grid-column:1/-1"><label>先生（タップで選択／自分で入力もできます）</label><div class="quickchips" id="fTeacherChips" style="margin-top:2px"><span class="dim">まず授業名を選ぶと担当の先生が出ます</span></div>'
+  + '<input id="fTeacherCustom" type="text" placeholder="先生の名前を入力（例: 〇〇）" style="display:none;width:100%;margin-top:8px"></div>'
   + '<div class="field starfield"><label>総合評価（星をタップ）</label><div class="starinput" data-row="overall"></div></div>'
   + '<div class="field starfield"><label>取りやすさ</label><div class="starinput" data-row="easy"></div></div>'
   + '<div class="field starfield"><label>充実度</label><div class="starinput" data-row="rich"></div></div>'
@@ -936,17 +952,72 @@ function renderReviews(){
   initStars(fv);
   bindMore();
   const courseInput = document.getElementById("fCourse");
-  const teacherSel = document.getElementById("fTeacher");
-  const fillTeachers = ()=>{ const nm = courseInput.value.trim(); const ts = [...new Set(COURSES.filter(c=>c.name===nm).map(c=>c.instructor))]; teacherSel.innerHTML = ts.length ? ts.map(t=>'<option>'+esc(t)+'</option>').join("") : '<option value="">（授業名を候補から選んでください）</option>'; };
-  courseInput.addEventListener("change", fillTeachers);
-  courseInput.addEventListener("blur", fillTeachers);
+  const suggestBox = document.getElementById("pkSuggest");
+  const teacherChips = document.getElementById("fTeacherChips");
+  const teacherCustom = document.getElementById("fTeacherCustom");
+  let pkDay = "", pkTerm = "", pkTag = "", pkTeacher = "", pkCustom = false, pkSelectedName = "";
+  const PK_DAYS = ["月","火","水","木","金","他"];
+  const PK_TERMS = ["春","秋","集中"];
+  const PK_TAGS = [...new Set(COURSES.flatMap(c=>c.tags||[]))];
+  const pkFilterBody = document.getElementById("pkFilterBody");
+  function pkRenderFilters(){
+    const grp = (label, vals, cur, attr)=>'<p class="zb-label" style="margin:8px 0 4px">'+label+'</p><div class="quickchips">'+vals.map(v=>'<button type="button" class="qchip'+(cur===v?" on":"")+'" data-'+attr+'="'+esc(v)+'">'+esc(v)+'</button>').join("")+'</div>';
+    pkFilterBody.innerHTML = grp("曜日", PK_DAYS, pkDay, "pkday") + grp("学期", PK_TERMS, pkTerm, "pkterm") + grp("ジャンル", PK_TAGS, pkTag, "pktag")
+      + '<p class="note" style="margin-top:6px">選んだ条件に合う授業だけが候補に出ます。もう一度押すと解除。</p>';
+    pkFilterBody.querySelectorAll("[data-pkday]").forEach(b=>b.onclick=()=>{ pkDay = pkDay===b.dataset.pkday ? "" : b.dataset.pkday; pkRenderFilters(); pkRenderSuggest(); });
+    pkFilterBody.querySelectorAll("[data-pkterm]").forEach(b=>b.onclick=()=>{ pkTerm = pkTerm===b.dataset.pkterm ? "" : b.dataset.pkterm; pkRenderFilters(); pkRenderSuggest(); });
+    pkFilterBody.querySelectorAll("[data-pktag]").forEach(b=>b.onclick=()=>{ pkTag = pkTag===b.dataset.pktag ? "" : b.dataset.pktag; pkRenderFilters(); pkRenderSuggest(); });
+  }
+  document.getElementById("pkFilterToggle").onclick = ()=>{ const open = pkFilterBody.style.display==="none"; pkFilterBody.style.display = open ? "" : "none"; document.getElementById("pkFilterToggle").textContent = open ? "絞り込みを閉じる" : "曜日・学期・ジャンルで絞る"; if(open) pkRenderFilters(); };
+  function pkNames(){
+    const q = courseInput.value.trim();
+    return [...new Set(COURSES.map(c=>c.name))].filter(nm=>{
+      const cs = COURSES.filter(c=>c.name===nm);
+      if(pkDay && !cs.some(c=>(c.schedule||"").indexOf(pkDay)===0)) return false;
+      if(pkTerm && !cs.some(c=> pkTerm==="集中" ? (c.term||"").indexOf("集")>=0 : c.term===pkTerm)) return false;
+      if(pkTag && !cs.some(c=>(c.tags||[]).indexOf(pkTag)>=0)) return false;
+      if(q && nm.indexOf(q)<0) return false;
+      return true;
+    }).slice(0, 12);
+  }
+  function pkRenderSuggest(){
+    const q = courseInput.value.trim();
+    if(!q && !pkDay && !pkTerm && !pkTag){ suggestBox.innerHTML = ""; return; }
+    const list = pkNames();
+    if(!list.length){ suggestBox.innerHTML = '<div class="pksug-empty">候補がありません。そのまま投稿すると「新しい授業」として載ります。</div>'; return; }
+    suggestBox.innerHTML = '<div class="pksug">' + list.map(nm=>{
+      const cs = COURSES.filter(c=>c.name===nm);
+      const ts = [...new Set(cs.map(c=>c.instructor))];
+      const sc = [...new Set(cs.map(c=>c.schedule).filter(Boolean))].slice(0,3).join("・");
+      return '<button type="button" class="pksugrow" data-pkname="'+esc(nm)+'"><strong>'+esc(nm)+'</strong><span>'+esc(ts.join("／"))+(ts.length>1 ? "（"+ts.length+"人）" : "")+(sc ? " ・ "+esc(sc) : "")+'</span></button>';
+    }).join("") + '</div>';
+    suggestBox.querySelectorAll("[data-pkname]").forEach(b=>b.onclick=()=>{ courseInput.value = b.dataset.pkname; pkSelectedName = b.dataset.pkname; suggestBox.innerHTML=""; pkRenderTeachers(); });
+  }
+  function pkRenderTeachers(){
+    const nm = courseInput.value.trim();
+    const ts = [...new Set(COURSES.filter(c=>c.name===nm).map(c=>c.instructor))];
+    pkTeacher = ""; pkCustom = false; teacherCustom.style.display = "none"; teacherCustom.value = "";
+    if(!ts.length){ teacherChips.innerHTML = '<span class="dim">この授業の担当データがないので、先生名は右下の欄ではなく下の入力欄から入れてください</span>'; teacherCustom.style.display = ""; pkCustom = true; return; }
+    teacherChips.innerHTML = ts.map(x=>'<button type="button" class="qchip" data-pkteacher="'+esc(x)+'">'+esc(x)+'</button>').join("")
+      + '<button type="button" class="qchip" data-pkteacher="__custom">その他（自分で入力）</button>';
+    teacherChips.querySelectorAll("[data-pkteacher]").forEach(b=>b.onclick=()=>{
+      teacherChips.querySelectorAll("[data-pkteacher]").forEach(x=>x.classList.remove("on")); b.classList.add("on");
+      if(b.dataset.pkteacher==="__custom"){ pkCustom = true; pkTeacher = ""; teacherCustom.style.display = ""; teacherCustom.focus(); }
+      else { pkCustom = false; pkTeacher = b.dataset.pkteacher; teacherCustom.style.display = "none"; }
+    });
+  }
+  courseInput.addEventListener("input", ()=>{ if(courseInput.value.trim()!==pkSelectedName){ pkSelectedName=""; teacherChips.innerHTML = '<span class="dim">まず授業名を選ぶと担当の先生が出ます</span>'; pkTeacher=""; pkCustom=false; teacherCustom.style.display="none"; } pkRenderSuggest(); });
+  courseInput.addEventListener("focus", pkRenderSuggest);
   document.getElementById("fSubmit").onclick = ()=>{
     if(!requireUser()) return;
-    const nm = courseInput.value.trim(); const teacher = teacherSel.value;
-    const entry = COURSES.find(c=>c.name===nm && c.instructor===teacher) || COURSES.find(c=>c.name===nm);
-    if(!entry){ toast("授業名を候補から選んでください"); return; }
+    const nm = courseInput.value.trim();
+    if(!nm){ toast("授業名を入力してください"); return; }
+    const teacher = pkCustom ? teacherCustom.value.trim() : pkTeacher;
     if(!fv.overall){ toast("総合評価の星を選んでください"); return; }
-    (reviews[entry.id] = reviews[entry.id] || []).unshift({ overall:fv.overall, easy:fv.easy||"", rich:fv.rich||"", skip:fv.skip||"", heavy:fv.heavy||"", body:document.getElementById("fBody").value.trim(), by:user.name+"（"+user.grade+"回生）", date:todayStr() });
+    const entry = COURSES.find(c=>c.name===nm && c.instructor===teacher) || COURSES.find(c=>c.name===nm);
+    const rv = { overall:fv.overall, easy:fv.easy||"", rich:fv.rich||"", skip:fv.skip||"", heavy:fv.heavy||"", body:document.getElementById("fBody").value.trim(), by:user.name+"（"+user.grade+"回生）", date:todayStr(), teacher:teacher || (entry ? entry.instructor : "") };
+    if(entry){ (reviews[entry.id] = reviews[entry.id] || []).unshift(rv); }
+    else { const key = "custom:" + nm; (reviews[key] = reviews[key] || []).unshift(rv); }
     save("bds_reviews", reviews); toast("口コミを投稿しました"); renderReviews();
   };
 }

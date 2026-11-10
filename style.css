@@ -219,6 +219,14 @@ body{ touch-action:manipulation }
 .zb-post p{ margin:4px 0 }
 .zb-teacher-link{ display:inline-block; background:#F7E9F1; border:1px solid #E3BCD2; color:var(--wine-dark); font-size:11.5px; border-radius:999px; padding:1px 9px; margin:0 4px 4px 0; font-weight:700 }
 .zb-teacher-link:hover{ text-decoration:none; background:#F1D3E4 }
+.zcd{ background:#F7E9F1; border:1.5px solid var(--wine); color:var(--wine-dark); border-radius:8px; padding:8px 12px; font-weight:800; font-size:14.5px; text-align:center; margin:0 0 12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis }
+.pksug{ border:1.5px solid var(--line); border-radius:8px; overflow:hidden; margin-top:8px }
+.pksugrow{ display:block; width:100%; text-align:left; background:#fff; border:0; border-bottom:1px solid #EFEAE6; padding:10px 12px; -webkit-tap-highlight-color:transparent }
+.pksugrow:last-child{ border-bottom:0 }
+.pksugrow strong{ display:block; font-size:15px; color:var(--ink) }
+.pksugrow span{ display:block; font-size:12px; color:var(--sub); margin-top:2px }
+.pksugrow:active{ background:#F7E9F1 }
+.pksug-empty{ margin-top:8px; font-size:13px; color:var(--sub); background:#FBF6F3; border:1px dashed #D8CFC9; border-radius:8px; padding:10px 12px }
 .reactrow{ display:flex; flex-wrap:wrap; gap:6px; margin:8px 0 2px }
 .reactbtn{ background:#fff; border:1.5px solid var(--line); border-radius:999px; padding:5px 12px; font-size:13px; font-weight:700; color:var(--ink); -webkit-tap-highlight-color:transparent }
 .reactbtn.on{ background:#F7E9F1; border-color:var(--wine); color:var(--wine-dark) }
