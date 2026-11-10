@@ -7,6 +7,90 @@ const $modal = document.getElementById("modal-root");
 
 function load(key, def){ try{ const v = localStorage.getItem(key); return v ? JSON.parse(v) : def; }catch(e){ return def; } }
 function save(key, v){ localStorage.setItem(key, JSON.stringify(v)); }
+/* ===== shared backend (Firestore REST) ===== */
+const FB_PROJECT = "kaigi-notes";
+const FB_KEY = "AIzaSyAgOI5q1QLQ45bsGMVLpQC9Hvo8igdVu0w";
+const FB_BASE = "https://firestore.googleapis.com/v1/projects/" + FB_PROJECT + "/databases/(default)/documents";
+let deviceId = load("bds_device_id", "");
+if(!deviceId){ deviceId = "dev" + Date.now().toString(36) + Math.random().toString(36).slice(2, 10); save("bds_device_id", deviceId); }
+function fsList(coll){
+  return fetch(FB_BASE + "/" + coll + "?key=" + FB_KEY + "&pageSize=300")
+    .then(r=> r.ok ? r.json() : null).then(j=> (j && j.documents) || []).catch(()=>null);
+}
+function fsSet(coll, id, fields){
+  return fetch(FB_BASE + "/" + coll + "/" + encodeURIComponent(id) + "?key=" + FB_KEY,
+    { method:"PATCH", headers:{ "Content-Type":"application/json" }, body: JSON.stringify({ fields }) }).catch(()=>null);
+}
+function fsDel(coll, id){
+  return fetch(FB_BASE + "/" + coll + "/" + encodeURIComponent(id) + "?key=" + FB_KEY, { method:"DELETE" }).catch(()=>null);
+}
+const FS_S = v => ({ stringValue: v == null ? "" : String(v) });
+const FS_A = a => ({ arrayValue: { values: (a||[]).map(x=>({ stringValue: String(x) })) } });
+const FS_T = () => ({ timestampValue: new Date().toISOString() });
+const fs_gs = f => (f && f.stringValue) || "";
+const fs_ga = f => ((f && f.arrayValue && f.arrayValue.values) || []).map(v=>v.stringValue || "");
+const fs_ca = f => (f && f.created_at && f.created_at.timestampValue) || "";
+const fs_id = d => (d.name || "").split("/").pop();
+function sbPushPost(p){
+  fsSet("zemi_posts", p.id, { teachers: FS_A(p.teachers), timing: FS_S(p.timing), body: FS_S(p.body), by_name: FS_S(p.by), date: FS_S(p.date), created_at: FS_T() });
+}
+function sbDeletePost(id){ fsDel("zemi_posts", id); }
+function sbPushReview(courseKey, rv){
+  if(!rv || !rv.id) return;
+  fsSet("reviews", rv.id, { course_key: FS_S(courseKey), data_json: FS_S(JSON.stringify(rv)), created_at: FS_T() });
+}
+function sbPushVote(v){
+  fsSet("zemi_votes", deviceId, { f: FS_S(v.f), s: FS_S(v.s), t: FS_S(v.t), updated_at: FS_T() });
+}
+function sbReact(key, kind, on){
+  const docId = key + "__" + kind + "__" + deviceId;
+  if(on) fsSet("reactions", docId, { post_key: FS_S(key), kind: FS_S(kind), device_id: FS_S(deviceId) });
+  else fsDel("reactions", docId);
+}
+async function sbSync(){
+  try{
+    const pdocs = await fsList("zemi_posts");
+    if(pdocs){
+      const serverPosts = pdocs.map(d=>{ const f = d.fields || {}; return { id: fs_id(d), teachers: fs_ga(f.teachers), timing: fs_gs(f.timing), body: fs_gs(f.body), by: fs_gs(f.by_name), date: fs_gs(f.date), _ca: fs_ca(f) }; });
+      serverPosts.sort((a,b)=> (b._ca || "").localeCompare(a._ca || ""));
+      const serverIds = new Set(serverPosts.map(x=>x.id));
+      const localOnly = (zemiBoard || []).filter(x=>!serverIds.has(x.id));
+      localOnly.forEach(lp=>sbPushPost(lp));
+      zemiBoard = localOnly.concat(serverPosts.map(x=>{ const o = Object.assign({}, x); delete o._ca; return o; }));
+      save("bds_zemi_board", zemiBoard);
+    }
+    const rdocs = await fsList("reviews");
+    if(rdocs){
+      const rows = rdocs.map(d=>{ const f = d.fields || {}; let data = null; try{ data = JSON.parse(fs_gs(f.data_json)); }catch(e){} return { id: fs_id(d), course_key: fs_gs(f.course_key), data, _ca: fs_ca(f) }; }).filter(r=>r.data);
+      rows.sort((a,b)=> (b._ca || "").localeCompare(a._ca || ""));
+      const serverIds = new Set(rows.map(r=>r.id));
+      const merged = {};
+      rows.forEach(r=>{ (merged[r.course_key] = merged[r.course_key] || []).push(r.data); });
+      Object.keys(reviews).forEach(k=>{ (reviews[k] || []).forEach(rv=>{ if(rv.id && !serverIds.has(rv.id)){ sbPushReview(k, rv); (merged[k] = merged[k] || []).push(rv); } }); });
+      reviews = merged;
+      save("bds_reviews", reviews);
+    }
+    const vdocs = await fsList("zemi_votes");
+    if(vdocs){
+      const rows = vdocs.map(d=>{ const f = d.fields || {}; return { device_id: fs_id(d), f: fs_gs(f.f), s: fs_gs(f.s), t: fs_gs(f.t) }; });
+      const mine = rows.find(r=>r.device_id === deviceId);
+      const others = rows.filter(r=>r.device_id !== deviceId).map(r=>({ f: r.f, s: r.s, t: r.t }));
+      const myLocal = (zemiVotes || []).find(v=>v.__mine) || null;
+      if(mine) zemiVotes = [{ f: mine.f, s: mine.s, t: mine.t, __mine: true }].concat(others);
+      else if(myLocal){ sbPushVote(myLocal); zemiVotes = [myLocal].concat(others); }
+      else zemiVotes = others;
+      save("bds_zemi_votes", zemiVotes);
+    }
+    const xdocs = await fsList("reactions");
+    if(xdocs){
+      const agg = {};
+      xdocs.forEach(d=>{ const f = d.fields || {}; const key = fs_gs(f.post_key), kind = fs_gs(f.kind); if(!key || !kind) return; const a = agg[key] = agg[key] || {}; const it = a[kind] = a[kind] || { c: 0, mine: false }; it.c += 1; if(fs_gs(f.device_id) === deviceId) it.mine = true; });
+      reactions = agg;
+      save("bds_reactions", reactions);
+    }
+    route();
+  }catch(e){}
+}
 function esc(s){ return String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
 function todayStr(){ const d=new Date(); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
 function toast(msg){ const t=document.createElement("div"); t.className="toast"; t.textContent=msg; document.body.appendChild(t); setTimeout(()=>t.remove(),2600); }
@@ -94,6 +178,7 @@ document.addEventListener("click", function(e){
     if(!confirm("この投稿を削除しますか？")) return;
     zemiBoard = (zemiBoard||[]).filter(function(x){ return x.id !== d.dataset.delzb; });
     save("bds_zemi_board", zemiBoard);
+    if(d.dataset.delzb.indexOf("seed-")!==0) sbDeletePost(d.dataset.delzb);
     toast("投稿を削除しました");
     route();
   }
@@ -517,8 +602,9 @@ function renderCourseDetail(name, tab){
     document.getElementById("rSubmit").onclick=()=>{
       if(!requireUser()) return;
       if(!rv.overall){ toast("総合評価の星を選んでください"); return; }
-      (reviews[c.id] = reviews[c.id] || []).unshift({ overall:rv.overall, easy:rv.easy||"", rich:rv.rich||"", skip:rv.skip||"", heavy:rv.heavy||"", body:document.getElementById("rBody").value.trim(), by:byName(), date:todayStr() });
-      save("bds_reviews", reviews); toast("口コミを投稿しました"); renderCourseDetail(name, "reviews");
+      const nrv = { id:"rv"+Date.now(), overall:rv.overall, easy:rv.easy||"", rich:rv.rich||"", skip:rv.skip||"", heavy:rv.heavy||"", body:document.getElementById("rBody").value.trim(), by:byName(), date:todayStr() };
+      (reviews[c.id] = reviews[c.id] || []).unshift(nrv);
+      save("bds_reviews", reviews); sbPushReview(c.id, nrv); toast("口コミを投稿しました"); renderCourseDetail(name, "reviews");
     };
   }
   if(courseTab==="exams"){
@@ -578,7 +664,7 @@ function zemiVotePanelHtml(){
   const rankHtml = ranked.length ? ranked.slice(0,8).map((x,i)=>
     '<div class="voterow"><span class="votemedal">' + (medals[i] || (i+1) + "位") + '</span><div class="votemain"><a href="#/zemi/' + esc(x.id) + '"><strong>' + esc(x.z.teacher) + ' ゼミ</strong></a><div class="votebar"><span style="width:' + Math.max(8, Math.round(x.a.p / maxP * 100)) + '%"></span></div></div><span class="votepts">' + x.a.p + 'pt</span><span class="votebreak">1位' + x.a.f + '・2位' + x.a.s + '・3位' + x.a.t + '</span></div>'
   ).join("") : '<div class="empty">まだ投票がありません。最初の1票を入れてください。</div>';
-  const my = (zemiVotes||[])[0] || null;
+  const my = (zemiVotes||[]).find(v=>v.__mine) || null;
   const opts = (sel)=>'<option value="">（選んでください）</option>' + ZEMI.map(z=>'<option value="' + esc(z.id) + '"' + (sel===z.id ? " selected" : "") + '>' + esc(z.teacher) + ' ゼミ（' + esc(z.field || "") + '）</option>').join("");
   return '<section class="zb-panel vote-panel"><h3>🏆 みんなのゼミ人気投票</h3>'
   + '<p class="sec-note" style="margin-bottom:8px">あなたが今いちばん行きたいゼミは？ 第1〜第3希望まで選んで投票できます（1位=3pt・2位=2pt・3位=1pt）。投票はあとから変更できます。</p>'
@@ -589,7 +675,7 @@ function zemiVotePanelHtml(){
   + '<p class="zb-label">第3希望（任意）</p><select id="voteT" class="votesel">' + opts(my ? my.t : "") + '</select>'
   + '<button class="btn" id="voteSubmit" style="width:100%;margin-top:12px">' + (my ? "投票を変更する" : "投票する") + '</button>'
   + (my ? '<p class="note" style="margin-top:8px">あなたの投票: 1位 ' + esc((ZEMI.find(x=>x.id===my.f)||{}).teacher || "-") + (my.s ? ' ／ 2位 ' + esc((ZEMI.find(x=>x.id===my.s)||{}).teacher || "-") : "") + (my.t ? ' ／ 3位 ' + esc((ZEMI.find(x=>x.id===my.t)||{}).teacher || "-") : "") + '</p>' : "")
-  + '<p class="note" style="margin-top:6px">※ いまはテスト運用中のため、この端末からの投票だけが集計に反映されます。みんなの票を本当に合算するには共有の仕組み（バックエンド）が必要です。</p>'
+  + '<p class="note" style="margin-top:6px">※ 投票はみんなの票と合算されてランキングに反映されます（1端末1票・変更可）。</p>'
   + '</section>';
 }
 function bindZemiVote(){
@@ -602,8 +688,9 @@ function bindZemiVote(){
     if(!f){ toast("第1希望を選んでください"); return; }
     const chosen = [f, s, tt].filter(Boolean);
     if(new Set(chosen).size !== chosen.length){ toast("同じゼミを複数には選べません"); return; }
-    zemiVotes = [{ f, s, t: tt, at: todayStr() }];
+    zemiVotes = [{ f, s, t: tt, at: todayStr(), __mine: true }].concat((zemiVotes||[]).filter(v=>!v.__mine));
     save("bds_zemi_votes", zemiVotes);
+    sbPushVote({ f, s, t: tt });
     toast("投票しました");
     renderZemi();
   };
@@ -656,7 +743,8 @@ function bindZemiBoard(){
     const body = document.getElementById("zbBody").value.trim();
     if(!zbSel.length){ toast("先生を1人選んでください"); return; }
     if(!body){ toast("本文を書いてください"); return; }
-    zemiBoard.unshift({ id:"zb"+Date.now(), teachers:zbSel.slice(), timing:zbTimingSel, body, by:"匿名の学生", date:todayStr() });
+    const np = { id:"zb"+Date.now(), teachers:zbSel.slice(), timing:zbTimingSel, body, by:"匿名の学生", date:todayStr() };
+    zemiBoard.unshift(np); sbPushPost(np);
     save("bds_zemi_board", zemiBoard);
     const tid = zbSel[0]; zbSel = [];
     toast("匿名で投稿しました。その先生のゼミページに載ります");
@@ -808,7 +896,8 @@ function renderZemiDetail(id, tab){
       if(!requireUser()) return;
       const body = document.getElementById("zpBody").value.trim();
       if(!body){ toast("本文を書いてください"); return; }
-      zemiBoard.unshift({ id:"zb"+Date.now(), teachers:[id], timing:document.getElementById("zpTiming").value, body, by:"匿名の学生", date:todayStr() });
+      const np2 = { id:"zb"+Date.now(), teachers:[id], timing:document.getElementById("zpTiming").value, body, by:"匿名の学生", date:todayStr() };
+      zemiBoard.unshift(np2); sbPushPost(np2);
       save("bds_zemi_board", zemiBoard); toast("投稿しました（掲示板にも載ります）"); renderZemiDetail(id, "posts");
     };
   }
@@ -1092,9 +1181,9 @@ function renderReviews(){
     const teacher = pkCustom ? teacherCustom.value.trim() : pkTeacher;
     if(!fv.overall){ toast("総合評価の星を選んでください"); return; }
     const entry = COURSES.find(c=>c.name===nm && c.instructor===teacher) || COURSES.find(c=>c.name===nm);
-    const rv = { overall:fv.overall, easy:fv.easy||"", rich:fv.rich||"", skip:fv.skip||"", heavy:fv.heavy||"", body:document.getElementById("fBody").value.trim(), by:byName(), date:todayStr(), teacher:teacher || (entry ? entry.instructor : "") };
-    if(entry){ (reviews[entry.id] = reviews[entry.id] || []).unshift(rv); }
-    else { const key = "custom:" + nm; (reviews[key] = reviews[key] || []).unshift(rv); }
+    const rv = { id:"rv"+Date.now(), overall:fv.overall, easy:fv.easy||"", rich:fv.rich||"", skip:fv.skip||"", heavy:fv.heavy||"", body:document.getElementById("fBody").value.trim(), by:byName(), date:todayStr(), teacher:teacher || (entry ? entry.instructor : "") };
+    if(entry){ (reviews[entry.id] = reviews[entry.id] || []).unshift(rv); sbPushReview(entry.id, rv); }
+    else { const key = "custom:" + nm; (reviews[key] = reviews[key] || []).unshift(rv); sbPushReview(key, rv); }
     save("bds_reviews", reviews); toast("口コミを投稿しました"); renderReviews();
   };
 }
@@ -1139,3 +1228,4 @@ document.querySelectorAll("[data-nav]").forEach(b=>{
 });
 renderUserbox();
 route();
+sbSync();
