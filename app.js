@@ -301,9 +301,6 @@ function route(){
   else if(p[0]==="reviews"){ setNav("reviews"); renderReviews(); }
   else if(p[0]==="mypage"){ setNav("mypage"); renderMypage(); }
   else { setNav("home"); renderHome(); }
-  if(noRegOpen() && !user && ["zemi","course","reviews","board","books"].includes(p[0])){
-    $app.insertAdjacentHTML("afterbegin", '<div class="noreg">🎓 期間限定（11/12 17:00まで）学生登録なしで投稿できます</div>');
-  }
 }
 window.addEventListener("hashchange", route);
 document.querySelector(".brand").addEventListener("click", e => { e.preventDefault(); navTo("#/"); });
