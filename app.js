@@ -54,10 +54,12 @@ async function sbSync(){
       const serverPosts = pdocs.map(d=>{ const f = d.fields || {}; return { id: fs_id(d), teachers: fs_ga(f.teachers), timing: fs_gs(f.timing), body: fs_gs(f.body), by: fs_gs(f.by_name), date: fs_gs(f.date), _ca: fs_ca(f) }; });
       serverPosts.sort((a,b)=> (b._ca || "").localeCompare(a._ca || ""));
       const serverIds = new Set(serverPosts.map(x=>x.id));
-      const localOnly = (zemiBoard || []).filter(x=>!serverIds.has(x.id));
+      const knownIds = new Set(load("bds_server_post_ids", []));
+      const localOnly = (zemiBoard || []).filter(x=>!serverIds.has(x.id) && !knownIds.has(x.id));
       localOnly.forEach(lp=>sbPushPost(lp));
       zemiBoard = localOnly.concat(serverPosts.map(x=>{ const o = Object.assign({}, x); delete o._ca; return o; }));
       save("bds_zemi_board", zemiBoard);
+      save("bds_server_post_ids", Array.from(serverIds));
     }
     const rdocs = await fsList("reviews");
     if(rdocs){
