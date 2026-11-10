@@ -36,11 +36,19 @@ let zbSel = [];
 let zbTimingSel = "説明会";
 let zbTimingFilter = "";
 let zbTeacherFilter = "";
+let zbDetailTiming = "";
+function moreWrap(itemsHtml, firstN, key){
+  if(itemsHtml.length <= firstN) return itemsHtml.join("");
+  return itemsHtml.slice(0,firstN).join("") + '<div id="more-'+key+'" style="display:none">' + itemsHtml.slice(firstN).join("") + '</div><button type="button" class="btn ghost" data-more="'+key+'" style="width:100%;margin-top:8px">続きを見る（残り'+(itemsHtml.length-firstN)+'件）</button>';
+}
+function bindMore(){
+  $app.querySelectorAll("[data-more]").forEach(b=>b.onclick=()=>{ const el=document.getElementById("more-"+b.dataset.more); if(el){ el.style.display=""; b.remove(); } });
+}
 function zemiBoardFor(zid){ return (zemiBoard||[]).filter(p=>(p.teachers||[]).includes(zid)); }
 function zemiBoardCard(p, linkTeachers){
   const ts = (p.teachers||[]).map(id=>ZEMI.find(z=>z.id===id)).filter(Boolean);
   const teacherHtml = ts.length ? '<p style="margin:2px 0 4px">'+ts.map(z=> linkTeachers===false ? '<span class="zb-teacher-link">'+esc(z.teacher)+' ゼミ</span>' : '<a class="zb-teacher-link" href="#/zemi/'+esc(z.id)+'/posts">'+esc(z.teacher)+' ゼミ</a>').join("")+'</p>' : '';
-  return '<article class="zb-post"><p class="post-head"><span class="tag sell">'+esc(p.timing||"その他")+'</span> <span>'+esc(p.by||"")+' ・ '+esc(p.date||"")+'</span></p>'+teacherHtml+'<p class="pre">'+esc(p.body||"")+'</p></article>';
+  return '<article class="zb-post"><p class="post-head"><span class="tag sell">'+esc(p.timing||"その他")+'</span> <span>'+(p.by==="運営" ? "運営" : "匿名の学生")+' ・ '+esc(p.date||"")+'</span></p>'+teacherHtml+'<p class="pre">'+esc(p.body||"")+'</p></article>';
 }
 let events = load("bds_events", []);
 const SEED_EVENTS = [{"id":"seed-g1","date":"2026-10-19","title":"【専門演習】全体説明会（参加必須）","type":"ゼミ説明会","memo":"12:20〜13:20 S201(大ホール)","short":"全体説明会"},{"id":"seed-g2","date":"2026-10-19","title":"【専門演習】履修要項(PDF)公開","type":"その他","memo":"関大LMSで配信","short":"要項公開"},{"id":"seed-g3","date":"2026-10-20","title":"【専門演習】個別説明会 期間（〜11/9）","type":"ゼミ説明会","memo":"各ゼミの説明会はこの期間に実施","short":"個別説明会期間"},{"id":"seed-g4","date":"2026-11-10","title":"【専門演習】申込開始 9:00","type":"その他","memo":"申込フォームは関大LMSに掲載。関大アカウントで回答","short":"申込開始"},{"id":"seed-g5","date":"2026-11-12","title":"【専門演習】申込締切 17:00","type":"その他","memo":"締切厳守","short":"申込締切"},{"id":"seed-z-0","date":"2026-11-05","title":"ゼミ説明会: 鷲尾 隆","type":"ゼミ説明会","memo":"11/5(木) 昼休み S002","short":"説明会: 鷲尾"},{"id":"seed-z-1","date":"2026-10-27","title":"ゼミ説明会: 鎌田 真由美","type":"ゼミ説明会","memo":"10/27(火) 14:00〜16:00 S002","short":"説明会: 鎌田"},{"id":"seed-z-2","date":"2026-10-28","title":"ゼミ説明会: 鎌田 真由美","type":"ゼミ説明会","memo":"10/28(水) 2限 S204","short":"説明会: 鎌田"},{"id":"seed-z-3","date":"2026-10-23","title":"ゼミ説明会: 福井 健一","type":"ゼミ説明会","memo":"10/23(金) 昼休み S205","short":"説明会: 福井"},{"id":"seed-z-4","date":"2026-10-27","title":"ゼミ説明会: 三崎 秀央","type":"ゼミ説明会","memo":"10/27(火) 3限 S206","short":"説明会: 三崎"},{"id":"seed-z-5","date":"2026-11-06","title":"ゼミ説明会: 三崎 秀央","type":"ゼミ説明会","memo":"11/6(金) 3限 S002","short":"説明会: 三崎"},{"id":"seed-z-6","date":"2026-10-26","title":"ゼミ説明会: 砂山 渡","type":"ゼミ説明会","memo":"10/26(月) 5限 S203","short":"説明会: 砂山"},{"id":"seed-z-7","date":"2026-10-28","title":"ゼミ説明会: 砂山 渡","type":"ゼミ説明会","memo":"10/28(水) 5限 S203","short":"説明会: 砂山"},{"id":"seed-z-8","date":"2026-11-05","title":"ゼミ説明会: 砂山 渡","type":"ゼミ説明会","memo":"11/5(木) 5限 S104（質問はメール sunayama@kansai-u.ac.jp）","short":"説明会: 砂山"},{"id":"seed-z-9","date":"2026-10-27","title":"ゼミ説明会: 高井 啓二","type":"ゼミ説明会","memo":"10/27(火) 2限 S204","short":"説明会: 高井"},{"id":"seed-z-10","date":"2026-11-05","title":"ゼミ説明会: 高井 啓二","type":"ゼミ説明会","memo":"11/5(木) 2限 S205","short":"説明会: 高井"},{"id":"seed-z-11","date":"2026-10-26","title":"ゼミ説明会: 森貞 誠","type":"ゼミ説明会","memo":"10/26(月) 昼休み S204","short":"説明会: 森貞"},{"id":"seed-z-12","date":"2026-10-28","title":"ゼミ説明会: 森貞 誠","type":"ゼミ説明会","memo":"10/28(水) 12:45〜 S206","short":"説明会: 森貞"},{"id":"seed-z-13","date":"2026-11-09","title":"ゼミ説明会: 森貞 誠","type":"ゼミ説明会","memo":"11/9(月) 5限 S103","short":"説明会: 森貞"},{"id":"seed-z-14","date":"2026-10-26","title":"ゼミ説明会: 向 真央","type":"ゼミ説明会","memo":"10/26(月) 昼休み S203","short":"説明会: 向"},{"id":"seed-z-15","date":"2026-10-27","title":"ゼミ説明会: 向 真央","type":"ゼミ説明会","memo":"10/27(火) 4限 S203","short":"説明会: 向"},{"id":"seed-z-16","date":"2026-11-05","title":"ゼミ説明会: 向 真央","type":"ゼミ説明会","memo":"11/5(木) 5限 S203","short":"説明会: 向"},{"id":"seed-z-17","date":"2026-11-09","title":"ゼミ説明会: 向 真央","type":"ゼミ説明会","memo":"11/9(月) 昼休み S203","short":"説明会: 向"},{"id":"seed-z-18","date":"2026-10-27","title":"ゼミ説明会: 丸野 由希","type":"ゼミ説明会","memo":"10/27(火) 昼休み S105","short":"説明会: 丸野"},{"id":"seed-z-19","date":"2026-11-05","title":"ゼミ説明会: 丸野 由希","type":"ゼミ説明会","memo":"11/5(木) 昼休み N107","short":"説明会: 丸野"},{"id":"seed-z-20","date":"2026-10-29","title":"ゼミ説明会: 中原 孝信","type":"ゼミ説明会","memo":"10/29(木) 18:00〜18:30 S201","short":"説明会: 中原"},{"id":"seed-z-21","date":"2026-10-30","title":"ゼミ説明会: 佐野 夏樹","type":"ゼミ説明会","memo":"10/30(金) 3限 S101","short":"説明会: 佐野"},{"id":"seed-z-22","date":"2026-11-09","title":"ゼミ説明会: 佐野 夏樹","type":"ゼミ説明会","memo":"11/9(月) 昼休み S204","short":"説明会: 佐野"},{"id":"seed-z-23","date":"2026-10-26","title":"ゼミ説明会: 安藤 雅行","type":"ゼミ説明会","memo":"10/26(月) 4限 S205","short":"説明会: 安藤"},{"id":"seed-z-24","date":"2026-10-27","title":"ゼミ説明会: 安藤 雅行","type":"ゼミ説明会","memo":"10/27(火) 3限 S103","short":"説明会: 安藤"},{"id":"seed-z-25","date":"2026-10-28","title":"ゼミ説明会: 安藤 雅行","type":"ゼミ説明会","memo":"10/28(水) 昼休み・5限 S204","short":"説明会: 安藤"},{"id":"seed-z-26","date":"2026-11-05","title":"ゼミ説明会: 安藤 雅行","type":"ゼミ説明会","memo":"11/5(木) 2限 S204","short":"説明会: 安藤"},{"id":"seed-z-27","date":"2026-11-09","title":"ゼミ説明会: 安藤 雅行","type":"ゼミ説明会","memo":"11/9(月) 4限 S205（10/29の回は中止）","short":"説明会: 安藤"},{"id":"seed-z-28","date":"2026-10-22","title":"ゼミ説明会: 川崎 正隆","type":"ゼミ説明会","memo":"2限（対面・終了）","short":"説明会: 川崎"},{"id":"seed-z-29","date":"2026-10-28","title":"ゼミ説明会: 池田 圭佑","type":"ゼミ説明会","memo":"リアルタイム配信（Teams/Zoom）: 10/28(水) 18:00","short":"説明会: 池田"},{"id":"seed-z-30","date":"2026-11-06","title":"ゼミ説明会: 池田 圭佑","type":"ゼミ説明会","memo":"11/6(金) 18:00","short":"説明会: 池田"},{"id":"seed-z-31","date":"2026-11-09","title":"ゼミ説明会: 池田 圭佑","type":"ゼミ説明会","memo":"11/9(月) 昼","short":"説明会: 池田"},{"id":"seed-z-32","date":"2026-10-26","title":"ゼミ説明会: 新田 直子","type":"ゼミ説明会","memo":"10/26(月) 昼休み N103","short":"説明会: 新田"},{"id":"seed-z-33","date":"2026-10-27","title":"ゼミ説明会: 新田 直子","type":"ゼミ説明会","memo":"10/27(火) 4限 S204","short":"説明会: 新田"},{"id":"seed-z-34","date":"2026-11-05","title":"ゼミ説明会: 新田 直子","type":"ゼミ説明会","memo":"11/5(木) 11:00〜12:00 N103","short":"説明会: 新田"},{"id":"seed-z-35","date":"2026-11-09","title":"ゼミ説明会: 新田 直子","type":"ゼミ説明会","memo":"11/9(月) 昼休み N103","short":"説明会: 新田"},{"id":"seed-z-36","date":"2026-10-26","title":"ゼミ説明会: 西出 亮","type":"ゼミ説明会","memo":"10/26(月) 4限 S002","short":"説明会: 西出"},{"id":"seed-z-37","date":"2026-10-28","title":"ゼミ説明会: 西出 亮","type":"ゼミ説明会","memo":"10/28(水) 5限 S206","short":"説明会: 西出"},{"id":"seed-z-38","date":"2026-11-05","title":"ゼミ説明会: 西出 亮","type":"ゼミ説明会","memo":"11/5(木) 5限 S102","short":"説明会: 西出"},{"id":"seed-z-39","date":"2026-10-26","title":"ゼミ説明会: 中園 宏幸","type":"ゼミ説明会","memo":"10/26(月) 4限 S204","short":"説明会: 中園"},{"id":"seed-z-40","date":"2026-10-29","title":"ゼミ説明会: 中園 宏幸","type":"ゼミ説明会","memo":"10/29(木) 11:00〜12:10・3限 S206","short":"説明会: 中園"},{"id":"seed-z-41","date":"2026-10-30","title":"ゼミ説明会: 中園 宏幸","type":"ゼミ説明会","memo":"10/30(金) 3限 S205","short":"説明会: 中園"},{"id":"seed-z-42","date":"2026-11-09","title":"ゼミ説明会: 中園 宏幸","type":"ゼミ説明会","memo":"11/9(月) 4限 S204","short":"説明会: 中園"},{"id":"seed-z-43","date":"2026-11-05","title":"ゼミ説明会: 伝住 周平","type":"ゼミ説明会","memo":"11/5(木) 昼休み N108 のみ（1回だけ）","short":"説明会: 伝住"},{"id":"seed-z-44","date":"2026-10-28","title":"ゼミ説明会: 岡部 格明","type":"ゼミ説明会","memo":"10/28(水) 2限 S203","short":"説明会: 岡部"},{"id":"seed-z-45","date":"2026-10-29","title":"ゼミ説明会: 岡部 格明","type":"ゼミ説明会","memo":"10/29(木) 3・4限 S204","short":"説明会: 岡部"},{"id":"seed-z-46","date":"2026-11-06","title":"ゼミ説明会: 岡部 格明","type":"ゼミ説明会","memo":"11/6(金) 4限 S206","short":"説明会: 岡部"},{"id":"seed-z-47","date":"2026-11-09","title":"ゼミ説明会: 岡部 格明","type":"ゼミ説明会","memo":"11/9(月) 4限 S205","short":"説明会: 岡部"},{"id":"seed-z-48","date":"2026-10-26","title":"ゼミ説明会: 周 暁康","type":"ゼミ説明会","memo":"10/26(月) 昼休み S206","short":"説明会: 周"},{"id":"seed-z-49","date":"2026-10-27","title":"ゼミ説明会: 周 暁康","type":"ゼミ説明会","memo":"10/27(火) 昼休み S104","short":"説明会: 周"},{"id":"seed-z-50","date":"2026-10-26","title":"ゼミ説明会: 石橋 健","type":"ゼミ説明会","memo":"10/26(月) 5限 S102","short":"説明会: 石橋"},{"id":"seed-z-51","date":"2026-10-27","title":"ゼミ説明会: 石橋 健","type":"ゼミ説明会","memo":"10/27(火) 昼休み S103","short":"説明会: 石橋"},{"id":"seed-z-52","date":"2026-11-09","title":"ゼミ説明会: 石橋 健","type":"ゼミ説明会","memo":"11/9(月) 5限 S101","short":"説明会: 石橋"},{"id":"seed-z-53","date":"2026-11-02","title":"ゼミ説明会: 河合 由起子","type":"ゼミ説明会","memo":"リアルタイム配信: 11/2(月) 昼","short":"説明会: 河合"},{"id":"seed-z-54","date":"2026-11-06","title":"ゼミ説明会: 河合 由起子","type":"ゼミ説明会","memo":"11/6(金) 昼","short":"説明会: 河合"},{"id":"seed-z-55","date":"2026-10-26","title":"ゼミ説明会: 叢（ソウ ズイシン）","type":"ゼミ説明会","memo":"昼 リアルタイム配信 ＋ オンデマンド資料あり","short":"説明会: 叢（ソウ"},{"id":"seed-z-56","date":"2026-10-30","title":"ゼミ説明会: 叢（ソウ ズイシン）","type":"ゼミ説明会","memo":"昼 リアルタイム配信 ＋ オンデマンド資料あり","short":"説明会: 叢（ソウ"},{"id":"seed-z-57","date":"2026-11-06","title":"ゼミ説明会: 叢（ソウ ズイシン）","type":"ゼミ説明会","memo":"昼 リアルタイム配信 ＋ オンデマンド資料あり","short":"説明会: 叢（ソウ"},{"id":"seed-z-58","date":"2026-10-29","title":"ゼミ説明会: 村上 始","type":"ゼミ説明会","memo":"16:50〜・17:20〜 S103","short":"説明会: 村上"},{"id":"seed-z-59","date":"2026-11-05","title":"ゼミ説明会: 村上 始","type":"ゼミ説明会","memo":"16:50〜・17:20〜 S103","short":"説明会: 村上"}];
@@ -389,7 +397,7 @@ function renderCourseDetail(name, tab){
   if(courseTab==="reviews"){
     body = '<section class="panel"><h3>口コミ（'+esc(c.instructor)+'先生）</h3>'
     + (avg!==null && rs.length>=3 ? '<p class="card-stars">'+stars(avg)+' 総合評価 '+avg.toFixed(1)+'（'+rs.length+'件）</p>' : (rs.length? '<p class="note">口コミは'+rs.length+'件。平均点は3件たまると表示されます。</p>':''))
-    + (rs.length ? rs.map(r=>{ const o=+(r.overall || r.easy)||0; const dims=[["取りやすさ",r.easy],["充実度",r.rich],["課題の重さ",r.heavy]].filter(d=>+d[1]>0).map(d=>d[0]+" "+stars(+d[1])).join(" ／ "); return '<div class="post"><p class="post-head"><span class="revstars">'+stars(o)+'</span> 総合'+(o||"-")+(dims? ' ／ '+dims : '')+' <span>'+esc(r.by||"")+' ・ '+esc(r.date||"")+'</span></p><p>'+esc(r.body||"")+'</p></div>'; }).join("") : '<div class="empty">まだ口コミがありません。受けたことがある人は、最初の1件を書いてください。</div>')
+    + (rs.length ? moreWrap(rs.map(r=>{ const o=+(r.overall || r.easy)||0; const dims=[["取りやすさ",r.easy],["充実度",r.rich],["休みやすさ",r.skip],["課題の重さ",r.heavy]].filter(d=>+d[1]>0).map(d=>d[0]+" "+stars(+d[1])).join(" ／ "); return '<div class="post"><p class="post-head"><span class="revstars">'+stars(o)+'</span> 総合'+(o||"-")+(dims? ' ／ '+dims : '')+' <span>'+esc(r.by||"")+' ・ '+esc(r.date||"")+'</span></p><p>'+esc(r.body||"")+'</p></div>'; }), 5, "rev") : '<div class="empty">まだ口コミがありません。受けたことがある人は、最初の1件を書いてください。</div>')
     + '<h4>口コミを書く</h4>'
     + '<div class="formgrid">'
     + '<div class="field starfield"><label>総合評価（星をタップ）</label><div class="starinput" data-row="overall"></div></div>'
@@ -421,6 +429,7 @@ function renderCourseDetail(name, tab){
   + '<div class="tabbar">'+tabBtn("syllabus","概要・成績") + tabBtn("reviews","口コミ（"+rs.length+"）") + tabBtn("exams","過去問（"+ex.length+"）")+'</div>'
   + body;
   $app.querySelectorAll("[data-t]").forEach(b=>b.onclick=()=>{ selectedTeacherIdx=+b.dataset.t; renderCourseDetail(name, courseTab); });
+  bindMore();
   $app.querySelectorAll("[data-ctab]").forEach(b=>b.onclick=()=>{ navTo("#/course/"+encodeURIComponent(name)+"/"+b.dataset.ctab); });
   if(courseTab==="syllabus"){
     document.getElementById("addCal").onclick=()=>{ calPresetTitle = name; navTo("#/calendar"); };
@@ -439,12 +448,12 @@ function renderCourseDetail(name, tab){
     };
   }
   if(courseTab==="reviews"){
-    const rv = { overall:0, easy:0, rich:0, heavy:0 };
+    const rv = { overall:0, easy:0, rich:0, skip:0, heavy:0 };
     initStars(rv);
     document.getElementById("rSubmit").onclick=()=>{
       if(!requireUser()) return;
       if(!rv.overall){ toast("総合評価の星を選んでください"); return; }
-      (reviews[c.id] = reviews[c.id] || []).unshift({ overall:rv.overall, easy:rv.easy||"", rich:rv.rich||"", heavy:rv.heavy||"", body:document.getElementById("rBody").value.trim(), by:user.name+"（"+user.grade+"回生）", date:todayStr() });
+      (reviews[c.id] = reviews[c.id] || []).unshift({ overall:rv.overall, easy:rv.easy||"", rich:rv.rich||"", skip:rv.skip||"", heavy:rv.heavy||"", body:document.getElementById("rBody").value.trim(), by:user.name+"（"+user.grade+"回生）", date:todayStr() });
       save("bds_reviews", reviews); toast("口コミを投稿しました"); renderCourseDetail(name, "reviews");
     };
   }
@@ -483,32 +492,18 @@ function fmtBadges(z){
 function linkifyBrief(t){
   return esc(t).replace(/https?:\/\/[^\s<]+/g, function(u){ return '<a href="' + u + '" target="_blank" rel="noopener">リンク</a>'; });
 }
-function zemiBoardListHtml(){
-  const list = (zemiBoard||[]).filter(p=>{
-    if(zbTimingFilter && (p.timing||"その他")!==zbTimingFilter) return false;
-    if(zbTeacherFilter && !(p.teachers||[]).includes(zbTeacherFilter)) return false;
-    return true;
-  });
-  if(!list.length) return '<div class="empty">まだこの条件の投稿はありません。説明会の感想など、最初の1件を書いてください。</div>';
-  return list.slice(0,40).map(p=>zemiBoardCard(p, true)).join("");
-}
 function zemiBoardSectionHtml(){
   return '<section class="zb-panel" id="zbPanel"><h3>💬 ゼミ みんなの掲示板</h3>'
-  + '<p class="sec-note" style="margin-bottom:4px">申込前に、みんなが持ってる情報を出し合う場所です。説明会の感想・先生の印象など、知ってることをそのまま書いてください。書いた投稿は、選んだ先生のゼミページにも自動で載ります。</p>'
-  + '<p class="zb-label">① 先生を選ぶ（複数OK・タップで選択）</p>'
+  + '<p class="sec-note" style="margin-bottom:4px">申込前に、みんなが持ってる情報を出し合う場所です。説明会の感想・先生の印象など、知ってることをそのまま書いてください。<strong>投稿は匿名で表示されます（名前は出ません）。</strong>書いた投稿は、選んだ先生のゼミページに載ります。複数の先生の話は、1人ずつ分けて投稿してください。</p>'
+  + '<p class="zb-label">① 先生を選ぶ（タップで1人）</p>'
   + '<input type="text" id="zbSearch" placeholder="先生名で絞る（例: 川崎）" style="width:100%;padding:9px 10px;border:1px solid #CFCBC6;border-radius:6px;background:#fff">'
   + '<div class="zb-teachers" id="zbTeachers">'+ZEMI.map(z=>'<button type="button" class="tchip'+(zbSel.includes(z.id)?" on":"")+'" data-zbteacher="'+esc(z.id)+'">'+esc(z.teacher)+'</button>').join("")+'</div>'
   + '<p class="zb-label">② いつの話？（タイミング）</p>'
-  + '<div class="quickchips" style="margin-top:2px">'+ZEMI_TIMINGS.map(t=>'<button type="button" class="qchip'+(zbTimingSel===t?" on":"")+'" data-zbtiming="'+esc(t)+'">'+esc(t)+'</button>').join("")+'</div>'
-  + '<p class="zb-label">③ ひとこと書く</p>'
+  + '<div class="quickchips" style="margin-top:2px">'+ZEMI_TIMINGS.map(x=>'<button type="button" class="qchip'+(zbTimingSel===x?" on":"")+'" data-zbtiming="'+esc(x)+'">'+esc(x)+'</button>').join("")+'</div>'
+  + '<p class="zb-label">③ ひとこと書く（匿名で投稿されます）</p>'
   + '<textarea id="zbBody" rows="3" placeholder="例: 説明会、先生の話が分かりやすくて質問もしやすかった。課題は毎週あるらしい。／ 例: 〇〇先生の説明会が厳しめの雰囲気だった" style="width:100%;padding:10px;border:1px solid #CFCBC6;border-radius:6px;background:#fff"></textarea>'
-  + '<button class="btn" id="zbSubmit" style="width:100%;margin-top:10px">掲示板に投稿する</button>'
-  + '<p class="note" style="margin-top:8px">※ 先生個人への誹謗中傷ではなく、説明会や活動で実際に感じた事実を書いてください。</p>'
-  + '<hr style="border:0;border-top:1px solid var(--line);margin:16px 0 6px">'
-  + '<p class="zb-label">みんなの投稿（'+(zemiBoard||[]).length+'件）― 絞り込み</p>'
-  + '<div class="quickchips" style="margin-top:2px"><button type="button" class="qchip'+(zbTimingFilter===""?" on":"")+'" data-zbfilter="">タイミング: すべて</button>'+ZEMI_TIMINGS.map(t=>'<button type="button" class="qchip'+(zbTimingFilter===t?" on":"")+'" data-zbfilter="'+esc(t)+'">'+esc(t)+'</button>').join("")+'</div>'
-  + '<div class="field" style="margin-top:8px"><label>先生で絞る</label><select id="zbTeacherFilter"><option value="">すべての先生</option>'+ZEMI.map(z=>'<option value="'+esc(z.id)+'"'+(zbTeacherFilter===z.id?" selected":"")+'>'+esc(z.teacher)+' ゼミ</option>').join("")+'</select></div>'
-  + '<div id="zbList">'+zemiBoardListHtml()+'</div>'
+  + '<button class="btn" id="zbSubmit" style="width:100%;margin-top:10px">掲示板に投稿する（匿名）</button>'
+  + '<p class="note" style="margin-top:8px">※ 先生個人への誹謗中傷ではなく、説明会や活動で実際に感じた事実を書いてください。投稿は各先生のゼミページの「書き込み」で読めます。</p>'
   + '</section>';
 }
 function bindZemiBoard(){
@@ -523,31 +518,23 @@ function bindZemiBoard(){
   });
   $app.querySelectorAll("[data-zbteacher]").forEach(b=>b.onclick=()=>{
     const id = b.dataset.zbteacher;
-    if(zbSel.includes(id)){ zbSel = zbSel.filter(x=>x!==id); b.classList.remove("on"); }
-    else { zbSel.push(id); b.classList.add("on"); }
+    zbSel = zbSel.includes(id) ? [] : [id];
+    $app.querySelectorAll("[data-zbteacher]").forEach(x=>x.classList.toggle("on", zbSel.includes(x.dataset.zbteacher)));
   });
   $app.querySelectorAll("[data-zbtiming]").forEach(b=>b.onclick=()=>{
     zbTimingSel = b.dataset.zbtiming;
     $app.querySelectorAll("[data-zbtiming]").forEach(x=>x.classList.toggle("on", x.dataset.zbtiming===zbTimingSel));
   });
-  const refreshList = ()=>{ const el=document.getElementById("zbList"); if(el) el.innerHTML = zemiBoardListHtml(); };
-  $app.querySelectorAll("[data-zbfilter]").forEach(b=>b.onclick=()=>{
-    zbTimingFilter = b.dataset.zbfilter;
-    $app.querySelectorAll("[data-zbfilter]").forEach(x=>x.classList.toggle("on", x.dataset.zbfilter===zbTimingFilter));
-    refreshList();
-  });
-  const tf = document.getElementById("zbTeacherFilter");
-  if(tf) tf.onchange = ()=>{ zbTeacherFilter = tf.value; refreshList(); };
   document.getElementById("zbSubmit").onclick = ()=>{
     if(!requireUser()) return;
     const body = document.getElementById("zbBody").value.trim();
-    if(!zbSel.length){ toast("先生を1人以上選んでください"); return; }
+    if(!zbSel.length){ toast("先生を1人選んでください"); return; }
     if(!body){ toast("本文を書いてください"); return; }
-    zemiBoard.unshift({ id:"zb"+Date.now(), teachers:zbSel.slice(), timing:zbTimingSel, body, by:user.name+"（"+user.grade+"回生）", date:todayStr() });
+    zemiBoard.unshift({ id:"zb"+Date.now(), teachers:zbSel.slice(), timing:zbTimingSel, body, by:"匿名の学生", date:todayStr() });
     save("bds_zemi_board", zemiBoard);
-    zbSel = []; zbTimingFilter=""; zbTeacherFilter="";
-    toast("掲示板に投稿しました"); renderZemi();
-    const panel = document.getElementById("zbPanel"); if(panel) panel.scrollIntoView({behavior:"smooth", block:"start"});
+    const tid = zbSel[0]; zbSel = [];
+    toast("匿名で投稿しました。その先生のゼミページに載ります");
+    navTo("#/zemi/"+tid+"/posts");
   };
 }
 function renderZemi(){
@@ -565,9 +552,11 @@ function renderZemi(){
   + '<div class="filters"><div class="row">'
   + '<div class="field" style="flex:1;min-width:200px"><label>キーワード（先生・研究分野）</label><input type="text" id="zQ" value="'+esc(zemiFilter.q)+'" placeholder="例: 機械学習、マーケティング"></div>'
   + '</div>'
+  + '<button type="button" class="btn small ghost" id="zFilterToggle" style="margin-top:10px">絞り込み（形式・ジャンル）を開く</button>'
+  + '<div id="zFilterBody" style="display:none">'
   + '<div class="quickchips" style="margin-top:10px">'+ZFORMATS.map(function(pr){ return '<button class="qchip '+(zemiFilter.fmt===pr[0]?"on":"")+'" data-zfmt="'+pr[0]+'">'+pr[1]+'</button>'; }).join("")+'</div>'
   + '<div class="quickchips">'+[""].concat(tags).map(function(t){ return '<button class="qchip '+(zemiFilter.tag===t?"on":"")+'" data-ztag="'+esc(t)+'">'+(t || "ジャンル: すべて")+'</button>'; }).join("")+'</div>'
-  + '</div>'
+  + '</div></div>'
   + '<p class="sec-note">'+list.length+'件のゼミが見つかりました</p>'
   + '<div class="grid">'+ list.map(z=>{
       const info = zemiInfo[z.id] || {};
@@ -583,6 +572,8 @@ function renderZemi(){
   $app.querySelectorAll("[data-zfmt]").forEach(b=>b.onclick=()=>{ zemiFilter.fmt=b.dataset.zfmt; renderZemi(); });
   $app.querySelectorAll("[data-ztag]").forEach(b=>b.onclick=()=>{ zemiFilter.tag=b.dataset.ztag; renderZemi(); });
   document.getElementById("zQ").addEventListener("keydown",e=>{ if(e.key==="Enter"){ zemiFilter.q=e.target.value; renderZemi(); } });
+  const zft = document.getElementById("zFilterToggle");
+  if(zft){ const zfb = document.getElementById("zFilterBody"); const openIt = ()=>{ if(zfb) zfb.style.display=""; zft.textContent="絞り込みを閉じる"; }; const closeIt = ()=>{ if(zfb) zfb.style.display="none"; zft.textContent="絞り込み（形式・ジャンル）を開く"; }; if(zemiFilter.fmt || zemiFilter.tag) openIt(); zft.onclick = ()=>{ (zfb && zfb.style.display==="none") ? openIt() : closeIt(); }; }
   bindZemiBoard();
 }
 function lmsLinkHtml(url, label, compact){
@@ -640,15 +631,18 @@ function renderZemiDetail(id, tab){
     + '</section>';
   }
   if(zemiTab==="posts"){
+    const fBoard = zbDetailTiming ? boardPosts.filter(x=>(x.timing||"その他")===zbDetailTiming) : boardPosts;
+    const fLegacy = zbDetailTiming ? [] : posts;
+    const allHtml = fBoard.map(x=>zemiBoardCard(x,false)).concat(fLegacy.map(x=>'<div class="post"><p class="post-head">'+esc(x.cat||"情報")+' <span>匿名の学生 ・ '+esc(x.date||"")+'</span></p><p>'+esc(x.body||"")+'</p></div>'));
     body = '<section class="panel"><h3>みんなの書き込み・掲示板（'+totalPosts+'件）</h3>'
-    + '<p class="note">ゼミ一覧の一番上の「ゼミ みんなの掲示板」でこの先生を選んで書かれた投稿も、ここに自動で載ります。</p>'
-    + (boardPosts.length ? boardPosts.map(p=>zemiBoardCard(p,false)).join("") : '')
-    + (posts.length ? posts.map(p=>'<div class="post"><p class="post-head">'+esc(p.cat||"情報")+' <span>'+esc(p.by||"")+' ・ '+esc(p.date||"")+'</span></p><p>'+esc(p.body||"")+'</p></div>').join("") : '')
-    + (!totalPosts ? '<div class="empty">まだ書き込みがありません。ゼミの雰囲気・選考・活動頻度など、知っていることを書いてください。</div>' : '')
-    + '<h4>この先生について書く（掲示板にも載ります）</h4><div class="formgrid">'
+    + '<p class="note">投稿は匿名で表示されます。ゼミ一覧の一番上の「ゼミ みんなの掲示板」でこの先生を選んで書かれた投稿も、ここに自動で載ります。</p>'
+    + '<button type="button" class="btn small ghost" id="zdFilterToggle">絞り込み（タイミング）を開く</button>'
+    + '<div id="zdFilterBody" style="display:none"><div class="quickchips" style="margin-top:8px"><button type="button" class="qchip'+(zbDetailTiming===""?" on":"")+'" data-zdfilter="">すべて</button>'+ZEMI_TIMINGS.map(x=>'<button type="button" class="qchip'+(zbDetailTiming===x?" on":"")+'" data-zdfilter="'+esc(x)+'">'+esc(x)+'</button>').join("")+'</div></div>'
+    + (allHtml.length ? moreWrap(allHtml, 5, "zb") : '<div class="empty">まだ書き込みがありません。ゼミの雰囲気・選考・活動頻度など、知っていることを書いてください。</div>')
+    + '<h4>この先生について書く（掲示板にも載ります・匿名）</h4><div class="formgrid">'
     + '<div class="field starfield"><label>いつの話？（タイミング）</label><select id="zpTiming">'+ZEMI_TIMINGS.map(x=>'<option>'+esc(x)+'</option>').join("")+'</select></div>'
     + '<div class="field" style="grid-column:1/-1"><label>本文</label><textarea id="zpBody" rows="3" placeholder="例: 説明会で質問しやすかった。週1回、発表とディスカッション中心。先生は現場経験の話が多め。"></textarea></div></div>'
-    + '<button class="btn" id="zpSubmit">投稿する</button></section>';
+    + '<button class="btn" id="zpSubmit">投稿する（匿名）</button></section>';
   }
   if(zemiTab==="info"){
     body = '<section class="panel"><h3>説明会・オンデマンド情報</h3>'
@@ -667,12 +661,16 @@ function renderZemiDetail(id, tab){
   + body;
   $app.querySelectorAll("[data-ztab]").forEach(b=>b.onclick=()=>{ navTo("#/zemi/"+id+"/"+b.dataset.ztab); });
   $app.querySelectorAll("[data-gosess]").forEach(b=>b.onclick=()=>{ const k=b.dataset.gosess; if(going[k]) delete going[k]; else going[k]=true; save("bds_going", going); renderZemiDetail(id, zemiTab); });
+  bindMore();
+  const zdft = document.getElementById("zdFilterToggle");
+  if(zdft){ const zdb = document.getElementById("zdFilterBody"); if(zbDetailTiming && zdb){ zdb.style.display=""; zdft.textContent="絞り込みを閉じる"; } zdft.onclick = ()=>{ if(!zdb) return; const open = zdb.style.display==="none"; zdb.style.display = open ? "" : "none"; zdft.textContent = open ? "絞り込みを閉じる" : "絞り込み（タイミング）を開く"; }; }
+  $app.querySelectorAll("[data-zdfilter]").forEach(b=>b.onclick=()=>{ zbDetailTiming=b.dataset.zdfilter; renderZemiDetail(id, "posts"); });
   if(zemiTab==="posts"){
     document.getElementById("zpSubmit").onclick=()=>{
       if(!requireUser()) return;
       const body = document.getElementById("zpBody").value.trim();
       if(!body){ toast("本文を書いてください"); return; }
-      zemiBoard.unshift({ id:"zb"+Date.now(), teachers:[id], timing:document.getElementById("zpTiming").value, body, by:user.name+"（"+user.grade+"回生）", date:todayStr() });
+      zemiBoard.unshift({ id:"zb"+Date.now(), teachers:[id], timing:document.getElementById("zpTiming").value, body, by:"匿名の学生", date:todayStr() });
       save("bds_zemi_board", zemiBoard); toast("投稿しました（掲示板にも載ります）"); renderZemiDetail(id, "posts");
     };
   }
@@ -874,15 +872,17 @@ function renderReviews(){
   + '<div class="field starfield"><label>総合評価（星をタップ）</label><div class="starinput" data-row="overall"></div></div>'
   + '<div class="field starfield"><label>取りやすさ</label><div class="starinput" data-row="easy"></div></div>'
   + '<div class="field starfield"><label>充実度</label><div class="starinput" data-row="rich"></div></div>'
+  + '<div class="field starfield"><label>休みやすさ（星が多いほど出席がゆるい・休んでも大丈夫）</label><div class="starinput" data-row="skip"></div></div>'
   + '<div class="field starfield"><label>課題の重さ（星が多いほど重い）</label><div class="starinput" data-row="heavy"></div></div>'
   + '<div class="field" style="grid-column:1/-1"><label>本文（任意）</label><textarea id="fBody" rows="3" placeholder="テストの傾向、出席の厳しさ、課題の量など、後輩が知りたいことを"></textarea></div>'
   + '</div><button class="btn" id="fSubmit">口コミを投稿</button></section>'
   + (ranked.length ? '<section class="panel"><h3>評価の高い授業（口コミ3件以上）</h3>' + ranked.map(x=>'<div class="listrow"><div><a href="#/course/'+encodeURIComponent(x.c.name)+'/reviews"><strong>'+esc(x.c.name)+'</strong></a><div class="card-meta">'+esc(x.c.instructor)+' ／ 口コミ'+x.n+'件</div></div><span class="card-stars">'+stars(x.avg)+' '+x.avg.toFixed(1)+'</span></div>').join("") + '</section>' : '')
   + '<section class="panel"><h3>新着の口コミ</h3>'
-  + (all.length ? all.slice(0,30).map(function(it){ const r=it.r, c=it.c; const o=+(r.overall || r.easy)||0; const dims=[["取りやすさ",r.easy],["充実度",r.rich],["課題の重さ",r.heavy]].filter(d=>+d[1]>0).map(d=>d[0]+" "+stars(+d[1])).join(" ／ "); return '<div class="post"><p class="post-head"><a href="#/course/'+encodeURIComponent(c.name)+'/reviews"><strong>'+esc(c.name)+'</strong></a>（'+esc(c.instructor)+'） <span class="revstars">'+stars(o)+'</span> 総合'+(o||"-")+(dims? ' ／ '+dims : '')+' <span>'+esc(r.by||"")+' ・ '+esc(r.date||"")+'</span></p><p>'+esc(r.body||"")+'</p></div>'; }).join("") : '<div class="empty">まだ口コミがありません。上のフォームから最初の1件を書いてください。</div>')
+  + (all.length ? moreWrap(all.slice(0,30).map(function(it){ const r=it.r, c=it.c; const o=+(r.overall || r.easy)||0; const dims=[["取りやすさ",r.easy],["充実度",r.rich],["休みやすさ",r.skip],["課題の重さ",r.heavy]].filter(d=>+d[1]>0).map(d=>d[0]+" "+stars(+d[1])).join(" ／ "); return '<div class="post"><p class="post-head"><a href="#/course/'+encodeURIComponent(c.name)+'/reviews"><strong>'+esc(c.name)+'</strong></a>（'+esc(c.instructor)+'） <span class="revstars">'+stars(o)+'</span> 総合'+(o||"-")+(dims? ' ／ '+dims : '')+' <span>'+esc(r.by||"")+' ・ '+esc(r.date||"")+'</span></p><p>'+esc(r.body||"")+'</p></div>'; }), 5, "feed") : '<div class="empty">まだ口コミがありません。上のフォームから最初の1件を書いてください。</div>')
   + '</section>';
-  const fv = { overall:0, easy:0, rich:0, heavy:0 };
+  const fv = { overall:0, easy:0, rich:0, skip:0, heavy:0 };
   initStars(fv);
+  bindMore();
   const courseInput = document.getElementById("fCourse");
   const teacherSel = document.getElementById("fTeacher");
   const fillTeachers = ()=>{ const nm = courseInput.value.trim(); const ts = [...new Set(COURSES.filter(c=>c.name===nm).map(c=>c.instructor))]; teacherSel.innerHTML = ts.length ? ts.map(t=>'<option>'+esc(t)+'</option>').join("") : '<option value="">（授業名を候補から選んでください）</option>'; };
@@ -894,7 +894,7 @@ function renderReviews(){
     const entry = COURSES.find(c=>c.name===nm && c.instructor===teacher) || COURSES.find(c=>c.name===nm);
     if(!entry){ toast("授業名を候補から選んでください"); return; }
     if(!fv.overall){ toast("総合評価の星を選んでください"); return; }
-    (reviews[entry.id] = reviews[entry.id] || []).unshift({ overall:fv.overall, easy:fv.easy||"", rich:fv.rich||"", heavy:fv.heavy||"", body:document.getElementById("fBody").value.trim(), by:user.name+"（"+user.grade+"回生）", date:todayStr() });
+    (reviews[entry.id] = reviews[entry.id] || []).unshift({ overall:fv.overall, easy:fv.easy||"", rich:fv.rich||"", skip:fv.skip||"", heavy:fv.heavy||"", body:document.getElementById("fBody").value.trim(), by:user.name+"（"+user.grade+"回生）", date:todayStr() });
     save("bds_reviews", reviews); toast("口コミを投稿しました"); renderReviews();
   };
 }
