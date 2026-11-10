@@ -29,6 +29,7 @@ let zemiPosts = load("bds_zemi_posts", {});
 let zemiInfo = load("bds_zemi_info", {});
 const ZEMI_TIMINGS = ["説明会","ゼミ選び・申込","ゼミ活動中","ゼミオリ・合宿・イベント","卒業後","その他"];
 let zemiBoard = load("bds_zemi_board", null);
+let zemiVotes = load("bds_zemi_votes", []);
 if(!zemiBoard){ zemiBoard = [
   {id:"seed-zb1", teachers:[], timing:"説明会", body:"ゼミ選びの情報交換用です。説明会に行った感想、先生の印象、質問しやすかったかなど、申込前にみんなが知りたいことを残してください。投稿は匿名です。複数の先生の話は1人ずつ分けて書いてください。ゼミが始まった後の様子や卒業後の話も、タイミングを選んで書けます。", by:"運営", date:"2026-11-10"}
 ]; save("bds_zemi_board", zemiBoard); }
@@ -563,6 +564,53 @@ function zemiBoardFeedHtml(){
   if(!list.length) return '<div class="empty">まだ投稿はありません。</div>';
   return moreWrap(list.map(x=>zemiBoardCard(x, true)), 5, "zbfeed");
 }
+function zemiVoteAgg(){
+  const agg = {};
+  (zemiVotes||[]).forEach(v=>{
+    if(v.f){ const a = agg[v.f] = agg[v.f] || {p:0,f:0,s:0,t:0}; a.p += 3; a.f += 1; }
+    if(v.s){ const a = agg[v.s] = agg[v.s] || {p:0,f:0,s:0,t:0}; a.p += 2; a.s += 1; }
+    if(v.t){ const a = agg[v.t] = agg[v.t] || {p:0,f:0,s:0,t:0}; a.p += 1; a.t += 1; }
+  });
+  return agg;
+}
+function zemiVotePanelHtml(){
+  const agg = zemiVoteAgg();
+  const ranked = Object.keys(agg).map(id=>({id, z:ZEMI.find(x=>x.id===id), a:agg[id]})).filter(x=>x.z).sort((x,y)=> y.a.p - x.a.p || y.a.f - x.a.f);
+  const maxP = ranked.length ? ranked[0].a.p : 0;
+  const medals = ["🥇","🥈","🥉"];
+  const rankHtml = ranked.length ? ranked.slice(0,8).map((x,i)=>
+    '<div class="voterow"><span class="votemedal">' + (medals[i] || (i+1) + "位") + '</span><div class="votemain"><a href="#/zemi/' + esc(x.id) + '"><strong>' + esc(x.z.teacher) + ' ゼミ</strong></a><div class="votebar"><span style="width:' + Math.max(8, Math.round(x.a.p / maxP * 100)) + '%"></span></div></div><span class="votepts">' + x.a.p + 'pt</span><span class="votebreak">1位' + x.a.f + '・2位' + x.a.s + '・3位' + x.a.t + '</span></div>'
+  ).join("") : '<div class="empty">まだ投票がありません。最初の1票を入れてください。</div>';
+  const my = (zemiVotes||[])[0] || null;
+  const opts = (sel)=>'<option value="">（選んでください）</option>' + ZEMI.map(z=>'<option value="' + esc(z.id) + '"' + (sel===z.id ? " selected" : "") + '>' + esc(z.teacher) + ' ゼミ（' + esc(z.field || "") + '）</option>').join("");
+  return '<section class="zb-panel vote-panel"><h3>🏆 みんなのゼミ人気投票</h3>'
+  + '<p class="sec-note" style="margin-bottom:8px">あなたが今いちばん行きたいゼミは？ 第1〜第3希望まで選んで投票できます（1位=3pt・2位=2pt・3位=1pt）。投票はあとから変更できます。</p>'
+  + rankHtml
+  + '<hr style="border:0;border-top:1px solid var(--line);margin:14px 0 4px">'
+  + '<p class="zb-label">第1希望</p><select id="voteF" class="votesel">' + opts(my ? my.f : "") + '</select>'
+  + '<p class="zb-label">第2希望（任意）</p><select id="voteS" class="votesel">' + opts(my ? my.s : "") + '</select>'
+  + '<p class="zb-label">第3希望（任意）</p><select id="voteT" class="votesel">' + opts(my ? my.t : "") + '</select>'
+  + '<button class="btn" id="voteSubmit" style="width:100%;margin-top:12px">' + (my ? "投票を変更する" : "投票する") + '</button>'
+  + (my ? '<p class="note" style="margin-top:8px">あなたの投票: 1位 ' + esc((ZEMI.find(x=>x.id===my.f)||{}).teacher || "-") + (my.s ? ' ／ 2位 ' + esc((ZEMI.find(x=>x.id===my.s)||{}).teacher || "-") : "") + (my.t ? ' ／ 3位 ' + esc((ZEMI.find(x=>x.id===my.t)||{}).teacher || "-") : "") + '</p>' : "")
+  + '<p class="note" style="margin-top:6px">※ いまはテスト運用中のため、この端末からの投票だけが集計に反映されます。みんなの票を本当に合算するには共有の仕組み（バックエンド）が必要です。</p>'
+  + '</section>';
+}
+function bindZemiVote(){
+  const btn = document.getElementById("voteSubmit");
+  if(!btn) return;
+  btn.onclick = ()=>{
+    const f = document.getElementById("voteF").value;
+    const s = document.getElementById("voteS").value;
+    const tt = document.getElementById("voteT").value;
+    if(!f){ toast("第1希望を選んでください"); return; }
+    const chosen = [f, s, tt].filter(Boolean);
+    if(new Set(chosen).size !== chosen.length){ toast("同じゼミを複数には選べません"); return; }
+    zemiVotes = [{ f, s, t: tt, at: todayStr() }];
+    save("bds_zemi_votes", zemiVotes);
+    toast("投票しました");
+    renderZemi();
+  };
+}
 function zemiBoardSectionHtml(){
   return '<section class="zb-panel" id="zbPanel"><h3>💬 ゼミ みんなの掲示板</h3>'
   + '<p class="sec-note" style="margin-bottom:4px">まず、みんなの声を読んでみてください。説明会の感想・先生の印象など、申込前に知りたい情報が集まる場所です。<strong>投稿は匿名で表示されます（名前は出ません）。</strong></p>'
@@ -638,6 +686,7 @@ function renderZemi(){
   '<div class="zcd" id="zemiCountdown">' + zemiCountdownHtml() + '</div>'
   + '<h2 class="sec"><span class="sec-en">SEMINAR</span>ゼミ一覧</h2>'
   + '<p class="sec-note">BDS学部のゼミ（専門演習）'+ZEMI.length+'件。研究分野は学部パンフレット2026から。説明会の日程・オンデマンド動画は分かった人が各ゼミのページで追加できます。</p>'
+  + zemiVotePanelHtml()
   + zemiBoardSectionHtml()
   + '<div class="filters"><div class="row">'
   + '<div class="field" style="flex:1;min-width:200px"><label>キーワード（先生・研究分野）</label><input type="text" id="zQ" value="'+esc(zemiFilter.q)+'" placeholder="例: 機械学習、マーケティング"></div>'
@@ -665,6 +714,7 @@ function renderZemi(){
   const zft = document.getElementById("zFilterToggle");
   if(zft){ const zfb = document.getElementById("zFilterBody"); const openIt = ()=>{ if(zfb) zfb.style.display=""; zft.textContent="絞り込みを閉じる"; }; const closeIt = ()=>{ if(zfb) zfb.style.display="none"; zft.textContent="絞り込み（形式・ジャンル）を開く"; }; if(zemiFilter.fmt || zemiFilter.tag) openIt(); zft.onclick = ()=>{ (zfb && zfb.style.display==="none") ? openIt() : closeIt(); }; }
   bindZemiBoard();
+  bindZemiVote();
 }
 function lmsLinkHtml(url, label, compact){
   if(url.includes("kulms")){

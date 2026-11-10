@@ -219,6 +219,16 @@ body{ touch-action:manipulation }
 .zb-post p{ margin:4px 0 }
 .zb-teacher-link{ display:inline-block; background:#F7E9F1; border:1px solid #E3BCD2; color:var(--wine-dark); font-size:11.5px; border-radius:999px; padding:1px 9px; margin:0 4px 4px 0; font-weight:700 }
 .zb-teacher-link:hover{ text-decoration:none; background:#F1D3E4 }
+.vote-panel{ background:linear-gradient(180deg,#FFFDF5,#FFF8E6); border-color:#D9A62E }
+.voterow{ display:flex; align-items:center; gap:8px; padding:7px 0; border-bottom:1px dashed #EFE3C2 }
+.voterow:last-of-type{ border-bottom:0 }
+.votemedal{ font-size:19px; width:28px; text-align:center; flex:none }
+.votemain{ flex:1; min-width:0 }
+.votebar{ background:#F1E7CB; border-radius:999px; height:8px; margin-top:4px; overflow:hidden }
+.votebar span{ display:block; height:100%; background:var(--wine); border-radius:999px }
+.votepts{ font-weight:900; color:var(--wine-dark); flex:none }
+.votebreak{ font-size:11.5px; color:var(--sub); flex:none }
+.votesel{ width:100%; padding:10px; border:1px solid #CFCBC6; border-radius:6px; background:#fff; font-size:15px }
 .noreg{ background:#FFF6E5; border:1.5px solid #D9A62E; color:#7A5A00; border-radius:8px; padding:8px 12px; font-weight:800; font-size:13.5px; text-align:center; margin:0 0 12px }
 .zcd{ background:#F7E9F1; border:1.5px solid var(--wine); color:var(--wine-dark); border-radius:8px; padding:8px 12px; font-weight:800; font-size:14.5px; text-align:center; margin:0 0 12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis }
 .pksug{ border:1.5px solid var(--line); border-radius:8px; overflow:hidden; margin-top:8px }
