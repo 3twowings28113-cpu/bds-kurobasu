@@ -30,8 +30,9 @@ let zemiInfo = load("bds_zemi_info", {});
 const ZEMI_TIMINGS = ["説明会","ゼミ選び・申込","ゼミ活動中","ゼミオリ・合宿・イベント","卒業後","その他"];
 let zemiBoard = load("bds_zemi_board", null);
 if(!zemiBoard){ zemiBoard = [
-  {id:"seed-zb1", teachers:[], timing:"説明会", body:"ゼミ選びの情報交換用です。説明会に行った感想、先生の印象、質問しやすかったかなど、申込前にみんなが知りたいことを残してください。先生は複数選べます。ゼミが始まった後の様子や卒業後の話も、タイミングを選んで書けます。", by:"運営", date:"2026-11-10"}
+  {id:"seed-zb1", teachers:[], timing:"説明会", body:"ゼミ選びの情報交換用です。説明会に行った感想、先生の印象、質問しやすかったかなど、申込前にみんなが知りたいことを残してください。投稿は匿名です。複数の先生の話は1人ずつ分けて書いてください。ゼミが始まった後の様子や卒業後の話も、タイミングを選んで書けます。", by:"運営", date:"2026-11-10"}
 ]; save("bds_zemi_board", zemiBoard); }
+{ const sd = (zemiBoard||[]).find(x=>x.id==="seed-zb1"); if(sd && sd.body && sd.body.includes("複数選べます")){ sd.body = "ゼミ選びの情報交換用です。説明会に行った感想、先生の印象、質問しやすかったかなど、申込前にみんなが知りたいことを残してください。投稿は匿名です。複数の先生の話は1人ずつ分けて書いてください。ゼミが始まった後の様子や卒業後の話も、タイミングを選んで書けます。"; save("bds_zemi_board", zemiBoard); } }
 let zbSel = [];
 let zbTimingSel = "説明会";
 let zbTimingFilter = "";
