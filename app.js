@@ -37,6 +37,7 @@ let zbTimingSel = "説明会";
 let zbTimingFilter = "";
 let zbTeacherFilter = "";
 let zbDetailTiming = "";
+let zbFeedTiming = "";
 function moreWrap(itemsHtml, firstN, key){
   if(itemsHtml.length <= firstN) return itemsHtml.join("");
   return itemsHtml.slice(0,firstN).join("") + '<div id="more-'+key+'" style="display:none">' + itemsHtml.slice(firstN).join("") + '</div><button type="button" class="btn ghost" data-more="'+key+'" style="width:100%;margin-top:8px">続きを見る（残り'+(itemsHtml.length-firstN)+'件）</button>';
@@ -492,9 +493,20 @@ function fmtBadges(z){
 function linkifyBrief(t){
   return esc(t).replace(/https?:\/\/[^\s<]+/g, function(u){ return '<a href="' + u + '" target="_blank" rel="noopener">リンク</a>'; });
 }
+function zemiBoardFeedHtml(){
+  const list = (zemiBoard||[]).filter(x=>!zbFeedTiming || (x.timing||"その他")===zbFeedTiming);
+  if(!list.length) return '<div class="empty">まだ投稿はありません。</div>';
+  return moreWrap(list.map(x=>zemiBoardCard(x, true)), 5, "zbfeed");
+}
 function zemiBoardSectionHtml(){
   return '<section class="zb-panel" id="zbPanel"><h3>💬 ゼミ みんなの掲示板</h3>'
-  + '<p class="sec-note" style="margin-bottom:4px">申込前に、みんなが持ってる情報を出し合う場所です。説明会の感想・先生の印象など、知ってることをそのまま書いてください。<strong>投稿は匿名で表示されます（名前は出ません）。</strong>書いた投稿は、選んだ先生のゼミページに載ります。複数の先生の話は、1人ずつ分けて投稿してください。</p>'
+  + '<p class="sec-note" style="margin-bottom:4px">まず、みんなの声を読んでみてください。説明会の感想・先生の印象など、申込前に知りたい情報が集まる場所です。<strong>投稿は匿名で表示されます（名前は出ません）。</strong></p>'
+  + '<button type="button" class="btn small ghost" id="zbFeedFilterToggle">絞り込み（タイミング）を開く</button>'
+  + '<div id="zbFeedFilterBody" style="display:none"><div class="quickchips" style="margin-top:8px"><button type="button" class="qchip'+(zbFeedTiming===""?" on":"")+'" data-zbfeedfilter="">すべて</button>'+ZEMI_TIMINGS.map(x=>'<button type="button" class="qchip'+(zbFeedTiming===x?" on":"")+'" data-zbfeedfilter="'+esc(x)+'">'+esc(x)+'</button>').join("")+'</div></div>'
+  + '<div id="zbFeed" style="margin-top:8px">'+zemiBoardFeedHtml()+'</div>'
+  + '<hr style="border:0;border-top:1px solid var(--line);margin:18px 0 4px">'
+  + '<h3 style="font-size:17px;margin:0 0 4px">✎ 読んだら、あなたの情報も残す（匿名）</h3>'
+  + '<p class="sec-note" style="margin-bottom:4px">複数の先生の話は、1人ずつ分けて投稿してください。書いた投稿は、選んだ先生のゼミページにも載ります。</p>'
   + '<p class="zb-label">① 先生を選ぶ（タップで1人）</p>'
   + '<input type="text" id="zbSearch" placeholder="先生名で絞る（例: 川崎）" style="width:100%;padding:9px 10px;border:1px solid #CFCBC6;border-radius:6px;background:#fff">'
   + '<div class="zb-teachers" id="zbTeachers">'+ZEMI.map(z=>'<button type="button" class="tchip'+(zbSel.includes(z.id)?" on":"")+'" data-zbteacher="'+esc(z.id)+'">'+esc(z.teacher)+'</button>').join("")+'</div>'
@@ -503,12 +515,16 @@ function zemiBoardSectionHtml(){
   + '<p class="zb-label">③ ひとこと書く（匿名で投稿されます）</p>'
   + '<textarea id="zbBody" rows="3" placeholder="例: 説明会、先生の話が分かりやすくて質問もしやすかった。課題は毎週あるらしい。／ 例: 〇〇先生の説明会が厳しめの雰囲気だった" style="width:100%;padding:10px;border:1px solid #CFCBC6;border-radius:6px;background:#fff"></textarea>'
   + '<button class="btn" id="zbSubmit" style="width:100%;margin-top:10px">掲示板に投稿する（匿名）</button>'
-  + '<p class="note" style="margin-top:8px">※ 先生個人への誹謗中傷ではなく、説明会や活動で実際に感じた事実を書いてください。投稿は各先生のゼミページの「書き込み」で読めます。</p>'
+  + '<p class="note" style="margin-top:8px">※ 先生個人への誹謗中傷ではなく、説明会や活動で実際に感じた事実を書いてください。</p>'
   + '</section>';
 }
 function bindZemiBoard(){
   const search = document.getElementById("zbSearch");
   if(!search) return;
+  bindMore();
+  const fft = document.getElementById("zbFeedFilterToggle");
+  if(fft){ const ffb = document.getElementById("zbFeedFilterBody"); if(zbFeedTiming && ffb){ ffb.style.display=""; fft.textContent="絞り込みを閉じる"; } fft.onclick = ()=>{ if(!ffb) return; const open = ffb.style.display==="none"; ffb.style.display = open ? "" : "none"; fft.textContent = open ? "絞り込みを閉じる" : "絞り込み（タイミング）を開く"; }; }
+  $app.querySelectorAll("[data-zbfeedfilter]").forEach(b=>b.onclick=()=>{ zbFeedTiming=b.dataset.zbfeedfilter; renderZemi(); });
   search.addEventListener("input", ()=>{
     const q = search.value.trim().toLowerCase();
     $app.querySelectorAll("[data-zbteacher]").forEach(b=>{
@@ -618,17 +634,18 @@ function renderZemiDetail(id, tab){
   const tabBtn = (k,label)=>'<button class="tabbtn '+(zemiTab===k?"on":"")+'" data-ztab="'+k+'">'+label+'</button>';
   let body = "";
   if(zemiTab==="about"){
-    body = '<section class="panel"><h3>ゼミ情報</h3>'
+    const voices = '<section class="panel"><h3>💬 みんなの声・掲示板（'+boardPosts.length+'件）</h3>'
+    + (boardPosts.length ? moreWrap(boardPosts.map(x=>zemiBoardCard(x,false)), 5, "aboutzb") : '<div class="empty">まだこの先生の掲示板投稿はありません。説明会の感想などを「書き込み」タブから書いてください。ゼミ一覧の一番上の掲示板からも書けます。</div>')
+    + '<p style="margin-top:10px"><a class="btn small" href="#/zemi/'+esc(id)+'/posts">この先生について書く・全部見る</a></p></section>';
+    body = voices
+    + '<section class="panel"><h3>ゼミ情報</h3>'
     + '<div class="kv"><span>担当</span><p>'+esc(z.teacher)+'（'+esc(z.title||"")+'）</p></div>'
     + '<div class="kv"><span>研究分野</span><p>'+esc(z.field||"")+'</p></div>'
-    + '<div class="kv"><span>タグ</span><p>'+(z.tags||[]).map(t=>'<span class="tag">'+esc(t)+'</span>').join(" ")+'</p></div>'
+    + '<div class="kv"><span>タグ</span><p>'+(z.tags||[]).map(x=>'<span class="tag">'+esc(x)+'</span>').join(" ")+'</p></div>'
     + '<div class="kv"><span>紹介</span><p class="pre">'+esc(z.intro||"")+'</p></div>'
     + '<div class="kv"><span>説明会</span><p>'+(brief? linkifyBrief(brief) : '<span class="dim">情報募集中（「説明会・動画」タブから追加できます）</span>')+'</p></div>'
     + '<div class="kv"><span>オンデマンド</span><p>'+(ond? (ond.startsWith("http")? lmsLinkHtml(ond, "ゼミ資料: " + z.teacher) : esc(ond)) : '<span class="dim">情報募集中</span>')+'</p></div>'
-    + '</section>' + sessSection(z, brief)
-    + '<section class="panel"><h3>💬 みんなの声・掲示板（'+boardPosts.length+'件）</h3>'
-    + (boardPosts.length ? boardPosts.slice(0,3).map(p=>zemiBoardCard(p,false)).join("") + '<p style="margin-top:10px"><a class="btn small" href="#/zemi/'+esc(id)+'/posts">この先生の投稿を全部見る・書く</a></p>' : '<div class="empty">まだこの先生の掲示板投稿はありません。説明会の感想などを「書き込み」タブから書いてください。ゼミ一覧の一番上の掲示板からも書けます。</div>')
-    + '</section>';
+    + '</section>' + sessSection(z, brief);
   }
   if(zemiTab==="posts"){
     const fBoard = zbDetailTiming ? boardPosts.filter(x=>(x.timing||"その他")===zbDetailTiming) : boardPosts;
@@ -865,7 +882,11 @@ function renderReviews(){
   const ranked = COURSES.map(c=>({c, avg:avgStars(c), n:courseReviews(c).length})).filter(x=>x.n>=3 && x.avg!==null).sort((a,b)=>b.avg-a.avg).slice(0,5);
   $app.innerHTML =
   '<h2 class="sec"><span class="sec-en">REVIEWS</span>みんなの口コミ</h2>'
-  + '<p class="sec-note">全授業の口コミの新着と、評価の高い授業です。下のフォームからすぐ書けます。</p>'
+  + '<p class="sec-note">全授業の口コミの新着と、評価の高い授業です。まず読んで、書くのは一番下のフォームから。</p>'
+  + (ranked.length ? '<section class="panel"><h3>評価の高い授業（口コミ3件以上）</h3>' + ranked.map(x=>'<div class="listrow"><div><a href="#/course/'+encodeURIComponent(x.c.name)+'/reviews"><strong>'+esc(x.c.name)+'</strong></a><div class="card-meta">'+esc(x.c.instructor)+' ／ 口コミ'+x.n+'件</div></div><span class="card-stars">'+stars(x.avg)+' '+x.avg.toFixed(1)+'</span></div>').join("") + '</section>' : '')
+  + '<section class="panel"><h3>新着の口コミ</h3>'
+  + (all.length ? moreWrap(all.slice(0,30).map(function(it){ const r=it.r, c=it.c; const o=+(r.overall || r.easy)||0; const dims=[["取りやすさ",r.easy],["充実度",r.rich],["休みやすさ",r.skip],["課題の重さ",r.heavy]].filter(d=>+d[1]>0).map(d=>d[0]+" "+stars(+d[1])).join(" ／ "); return '<div class="post"><p class="post-head"><a href="#/course/'+encodeURIComponent(c.name)+'/reviews"><strong>'+esc(c.name)+'</strong></a>（'+esc(c.instructor)+'） <span class="revstars">'+stars(o)+'</span> 総合'+(o||"-")+(dims? ' ／ '+dims : '')+' <span>'+esc(r.by||"")+' ・ '+esc(r.date||"")+'</span></p><p>'+esc(r.body||"")+'</p></div>'; }), 5, "feed") : '<div class="empty">まだ口コミがありません。下のフォームから最初の1件を書いてください。</div>')
+  + '</section>'
   + '<section class="panel"><h3>口コミを書く</h3><div class="formgrid">'
   + '<div class="field"><label>授業名</label><input id="fCourse" type="text" list="courseNames" placeholder="例: AI基礎"><datalist id="courseNames">' + [...new Set(COURSES.map(c=>c.name))].map(n=>'<option value="'+esc(n)+'">').join("") + '</datalist></div>'
   + '<div class="field"><label>先生</label><select id="fTeacher"><option value="">（先に授業名を入力）</option></select></div>'
@@ -875,11 +896,7 @@ function renderReviews(){
   + '<div class="field starfield"><label>休みやすさ（星が多いほど出席がゆるい・休んでも大丈夫）</label><div class="starinput" data-row="skip"></div></div>'
   + '<div class="field starfield"><label>課題の重さ（星が多いほど重い）</label><div class="starinput" data-row="heavy"></div></div>'
   + '<div class="field" style="grid-column:1/-1"><label>本文（任意）</label><textarea id="fBody" rows="3" placeholder="テストの傾向、出席の厳しさ、課題の量など、後輩が知りたいことを"></textarea></div>'
-  + '</div><button class="btn" id="fSubmit">口コミを投稿</button></section>'
-  + (ranked.length ? '<section class="panel"><h3>評価の高い授業（口コミ3件以上）</h3>' + ranked.map(x=>'<div class="listrow"><div><a href="#/course/'+encodeURIComponent(x.c.name)+'/reviews"><strong>'+esc(x.c.name)+'</strong></a><div class="card-meta">'+esc(x.c.instructor)+' ／ 口コミ'+x.n+'件</div></div><span class="card-stars">'+stars(x.avg)+' '+x.avg.toFixed(1)+'</span></div>').join("") + '</section>' : '')
-  + '<section class="panel"><h3>新着の口コミ</h3>'
-  + (all.length ? moreWrap(all.slice(0,30).map(function(it){ const r=it.r, c=it.c; const o=+(r.overall || r.easy)||0; const dims=[["取りやすさ",r.easy],["充実度",r.rich],["休みやすさ",r.skip],["課題の重さ",r.heavy]].filter(d=>+d[1]>0).map(d=>d[0]+" "+stars(+d[1])).join(" ／ "); return '<div class="post"><p class="post-head"><a href="#/course/'+encodeURIComponent(c.name)+'/reviews"><strong>'+esc(c.name)+'</strong></a>（'+esc(c.instructor)+'） <span class="revstars">'+stars(o)+'</span> 総合'+(o||"-")+(dims? ' ／ '+dims : '')+' <span>'+esc(r.by||"")+' ・ '+esc(r.date||"")+'</span></p><p>'+esc(r.body||"")+'</p></div>'; }), 5, "feed") : '<div class="empty">まだ口コミがありません。上のフォームから最初の1件を書いてください。</div>')
-  + '</section>';
+  + '</div><button class="btn" id="fSubmit">口コミを投稿</button></section>';
   const fv = { overall:0, easy:0, rich:0, skip:0, heavy:0 };
   initStars(fv);
   bindMore();
