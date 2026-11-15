@@ -423,7 +423,7 @@ function parseHash(){
   return raw.split("/").map(s=>{ try{ return decodeURIComponent(s); }catch(e){ return s; } });
 }
 function setNav(key){
-  const tabOf = { courses:"study", course:"study", zemi:"study", reviews:"study" };
+  const tabOf = { courses:"study", course:"study", zemi:"study", reviews:"study", calendar:"more", mypage:"more" };
   const tab = tabOf[key] || key;
   document.querySelectorAll("[data-nav]").forEach(x=>x.classList.toggle("active", x.dataset.nav===key || x.dataset.nav===tab));
 }
@@ -444,6 +444,7 @@ function route(){
   else if(p[0]==="board"){ setNav("board"); renderBoard(); }
   else if(p[0]==="reviews"){ setNav("reviews"); renderReviews(); }
   else if(p[0]==="mypage"){ setNav("mypage"); renderMypage(); }
+  else if(p[0]==="more"){ setNav("more"); renderMore(); }
   else { setNav("home"); renderHome(); }
 }
 window.addEventListener("hashchange", route);
@@ -1570,6 +1571,24 @@ function mypageTop(){
   + '</section>';
   return prof + clickHtml;
 }
+
+/* ---------- more (all-features menu) ---------- */
+function renderMore(){
+  const row = (href, icon, title, sub)=>'<a class="more-row" href="'+href+'"><span class="more-ic">'+icon+'</span><span class="more-tx"><strong>'+title+'</strong><small>'+sub+'</small></span><span class="more-ar">›</span></a>';
+  $app.innerHTML = '<h2 class="sec">その他</h2>'
+  + '<section class="panel more-list">'
+  + row("#/calendar", "📅", "カレンダー（予定）", "授業・ゼミ・イベントの日程と、自分の予定の追加")
+  + row("#/mypage", "👤", "マイページ", "履修候補リスト・欠席カウンター・教科書の取引")
+  + row("#/zemi", "🎓", "ゼミ掲示板・人気投票", "ゼミページの上のタブから切り替え")
+  + row("#/reviews", "💬", "口コミ", "授業の口コミを書く・読む")
+  + row("#/courses", "📝", "過去問", "授業ページの「過去問」タブにあります")
+  + '<button class="more-row" id="moreProf"><span class="more-ic">✏️</span><span class="more-tx"><strong>学生登録・プロフィール</strong><small>名前と学年の登録・変更</small></span><span class="more-ar">›</span></button>'
+  + '</section>'
+  + '<p class="sec-note">下のタブに入りきらない機能は、ここに全部入っています。</p>';
+  const mp = document.getElementById("moreProf");
+  if(mp) mp.onclick = function(){ showGate(); };
+}
+
 function renderMypage(){
   const list = candidates.map(id=>COURSES.find(c=>c.id===id)).filter(Boolean);
   const absList = Object.keys(absences).map(id=>COURSES.find(c=>c.id===id)).filter(Boolean);

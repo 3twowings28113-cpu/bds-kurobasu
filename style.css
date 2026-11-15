@@ -514,3 +514,14 @@ body.bk-white{ background:#fff }
 
 .deal-back{ display:flex; justify-content:space-between; align-items:center; padding:12px 2px 0; font-weight:700; font-size:14.5px }
 .deal-sum .tag{ white-space:nowrap; flex:none }
+
+/* ===== more menu ===== */
+.more-list{ padding:6px 0 }
+.more-row{ display:flex; align-items:center; gap:12px; width:100%; padding:13px 16px; background:none; border:0; border-bottom:1px solid #F0ECE8; color:var(--ink); text-align:left; font-family:inherit; cursor:pointer }
+.more-row:last-child{ border-bottom:0 }
+a.more-row:hover{ text-decoration:none; background:#FBF7F4 }
+.more-ic{ font-size:20px; width:28px; text-align:center; flex:none }
+.more-tx{ flex:1; min-width:0 }
+.more-tx strong{ display:block; font-size:15px; line-height:1.35 }
+.more-tx small{ display:block; color:var(--mut); font-size:12px; line-height:1.45; margin-top:1px }
+.more-ar{ color:#C4BBAF; font-size:20px; flex:none }
