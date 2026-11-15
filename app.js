@@ -46,6 +46,10 @@ function sbPushBook(bk){
   if(!bk || !bk.id) return;
   fsSet("books", bk.id, { data_json: FS_S(JSON.stringify(bk)), created_at: FS_T() });
 }
+function sbPushDeal(d){
+  if(!d || !d.id) return;
+  fsSet("book_deals", d.id, { data_json: FS_S(JSON.stringify(d)), created_at: FS_T() });
+}
 function sbReact(key, kind, on){
   const docId = key + "__" + kind + "__" + deviceId;
   if(on) fsSet("reactions", docId, { post_key: FS_S(key), kind: FS_S(kind), device_id: FS_S(deviceId) });
@@ -98,6 +102,28 @@ async function sbSync(){
       books.forEach(b=>{ b.type = b.type || "sell"; b.status = b.status || "open"; b.msgs = b.msgs || []; b.place = b.place || ""; b.when = b.when || ""; });
       save("bds_books", books);
       save("bds_server_book_ids", Array.from(serverBIds));
+    }
+    const ddocs = await fsList("book_deals");
+    if(ddocs){
+      const serverDeals = ddocs.map(d=>{ const f = d.fields || {}; let data = null; try{ data = JSON.parse(fs_gs(f.data_json)); }catch(e){} return data; }).filter(Boolean);
+      const serverDIds = new Set(serverDeals.map(x=>x.id));
+      const knownDIds = new Set(load("bds_server_deal_ids", []));
+      const localById = {}; (deals || []).forEach(d=>{ localById[d.id] = d; });
+      const mergedDeals = [];
+      serverDeals.forEach(sd=>{
+        const ld = localById[sd.id];
+        if(ld && (ld.updatedAt || 0) > (sd.updatedAt || 0)){ mergedDeals.push(ld); sbPushDeal(ld); }
+        else mergedDeals.push(sd);
+        delete localById[sd.id];
+      });
+      Object.keys(localById).forEach(k=>{
+        const ld = localById[k];
+        if(!knownDIds.has(k)) sbPushDeal(ld);
+        mergedDeals.push(ld);
+      });
+      deals = mergedDeals;
+      save("bds_deals", deals);
+      save("bds_server_deal_ids", Array.from(serverDIds));
     }
     const xdocs = await fsList("reactions");
     if(xdocs){
@@ -219,6 +245,7 @@ let events = load("bds_events", []);
 const SEED_EVENTS = [{"id":"seed-g1","date":"2026-10-19","title":"【専門演習】全体説明会（参加必須）","type":"ゼミ説明会","memo":"12:20〜13:20 S201(大ホール)","short":"全体説明会"},{"id":"seed-g2","date":"2026-10-19","title":"【専門演習】履修要項(PDF)公開","type":"その他","memo":"関大LMSで配信","short":"要項公開"},{"id":"seed-g3","date":"2026-10-20","title":"【専門演習】個別説明会 期間（〜11/9）","type":"ゼミ説明会","memo":"各ゼミの説明会はこの期間に実施","short":"個別説明会期間"},{"id":"seed-g4","date":"2026-11-10","title":"【専門演習】申込開始 9:00","type":"その他","memo":"申込フォームは関大LMSに掲載。関大アカウントで回答","short":"申込開始"},{"id":"seed-g5","date":"2026-11-12","title":"【専門演習】申込締切 17:00","type":"その他","memo":"締切厳守","short":"申込締切"},{"id":"seed-z-0","date":"2026-11-05","title":"ゼミ説明会: 鷲尾 隆","type":"ゼミ説明会","memo":"11/5(木) 昼休み S002","short":"説明会: 鷲尾"},{"id":"seed-z-1","date":"2026-10-27","title":"ゼミ説明会: 鎌田 真由美","type":"ゼミ説明会","memo":"10/27(火) 14:00〜16:00 S002","short":"説明会: 鎌田"},{"id":"seed-z-2","date":"2026-10-28","title":"ゼミ説明会: 鎌田 真由美","type":"ゼミ説明会","memo":"10/28(水) 2限 S204","short":"説明会: 鎌田"},{"id":"seed-z-3","date":"2026-10-23","title":"ゼミ説明会: 福井 健一","type":"ゼミ説明会","memo":"10/23(金) 昼休み S205","short":"説明会: 福井"},{"id":"seed-z-4","date":"2026-10-27","title":"ゼミ説明会: 三崎 秀央","type":"ゼミ説明会","memo":"10/27(火) 3限 S206","short":"説明会: 三崎"},{"id":"seed-z-5","date":"2026-11-06","title":"ゼミ説明会: 三崎 秀央","type":"ゼミ説明会","memo":"11/6(金) 3限 S002","short":"説明会: 三崎"},{"id":"seed-z-6","date":"2026-10-26","title":"ゼミ説明会: 砂山 渡","type":"ゼミ説明会","memo":"10/26(月) 5限 S203","short":"説明会: 砂山"},{"id":"seed-z-7","date":"2026-10-28","title":"ゼミ説明会: 砂山 渡","type":"ゼミ説明会","memo":"10/28(水) 5限 S203","short":"説明会: 砂山"},{"id":"seed-z-8","date":"2026-11-05","title":"ゼミ説明会: 砂山 渡","type":"ゼミ説明会","memo":"11/5(木) 5限 S104（質問はメール sunayama@kansai-u.ac.jp）","short":"説明会: 砂山"},{"id":"seed-z-9","date":"2026-10-27","title":"ゼミ説明会: 高井 啓二","type":"ゼミ説明会","memo":"10/27(火) 2限 S204","short":"説明会: 高井"},{"id":"seed-z-10","date":"2026-11-05","title":"ゼミ説明会: 高井 啓二","type":"ゼミ説明会","memo":"11/5(木) 2限 S205","short":"説明会: 高井"},{"id":"seed-z-11","date":"2026-10-26","title":"ゼミ説明会: 森貞 誠","type":"ゼミ説明会","memo":"10/26(月) 昼休み S204","short":"説明会: 森貞"},{"id":"seed-z-12","date":"2026-10-28","title":"ゼミ説明会: 森貞 誠","type":"ゼミ説明会","memo":"10/28(水) 12:45〜 S206","short":"説明会: 森貞"},{"id":"seed-z-13","date":"2026-11-09","title":"ゼミ説明会: 森貞 誠","type":"ゼミ説明会","memo":"11/9(月) 5限 S103","short":"説明会: 森貞"},{"id":"seed-z-14","date":"2026-10-26","title":"ゼミ説明会: 向 真央","type":"ゼミ説明会","memo":"10/26(月) 昼休み S203","short":"説明会: 向"},{"id":"seed-z-15","date":"2026-10-27","title":"ゼミ説明会: 向 真央","type":"ゼミ説明会","memo":"10/27(火) 4限 S203","short":"説明会: 向"},{"id":"seed-z-16","date":"2026-11-05","title":"ゼミ説明会: 向 真央","type":"ゼミ説明会","memo":"11/5(木) 5限 S203","short":"説明会: 向"},{"id":"seed-z-17","date":"2026-11-09","title":"ゼミ説明会: 向 真央","type":"ゼミ説明会","memo":"11/9(月) 昼休み S203","short":"説明会: 向"},{"id":"seed-z-18","date":"2026-10-27","title":"ゼミ説明会: 丸野 由希","type":"ゼミ説明会","memo":"10/27(火) 昼休み S105","short":"説明会: 丸野"},{"id":"seed-z-19","date":"2026-11-05","title":"ゼミ説明会: 丸野 由希","type":"ゼミ説明会","memo":"11/5(木) 昼休み N107","short":"説明会: 丸野"},{"id":"seed-z-20","date":"2026-10-29","title":"ゼミ説明会: 中原 孝信","type":"ゼミ説明会","memo":"10/29(木) 18:00〜18:30 S201","short":"説明会: 中原"},{"id":"seed-z-21","date":"2026-10-30","title":"ゼミ説明会: 佐野 夏樹","type":"ゼミ説明会","memo":"10/30(金) 3限 S101","short":"説明会: 佐野"},{"id":"seed-z-22","date":"2026-11-09","title":"ゼミ説明会: 佐野 夏樹","type":"ゼミ説明会","memo":"11/9(月) 昼休み S204","short":"説明会: 佐野"},{"id":"seed-z-23","date":"2026-10-26","title":"ゼミ説明会: 安藤 雅行","type":"ゼミ説明会","memo":"10/26(月) 4限 S205","short":"説明会: 安藤"},{"id":"seed-z-24","date":"2026-10-27","title":"ゼミ説明会: 安藤 雅行","type":"ゼミ説明会","memo":"10/27(火) 3限 S103","short":"説明会: 安藤"},{"id":"seed-z-25","date":"2026-10-28","title":"ゼミ説明会: 安藤 雅行","type":"ゼミ説明会","memo":"10/28(水) 昼休み・5限 S204","short":"説明会: 安藤"},{"id":"seed-z-26","date":"2026-11-05","title":"ゼミ説明会: 安藤 雅行","type":"ゼミ説明会","memo":"11/5(木) 2限 S204","short":"説明会: 安藤"},{"id":"seed-z-27","date":"2026-11-09","title":"ゼミ説明会: 安藤 雅行","type":"ゼミ説明会","memo":"11/9(月) 4限 S205（10/29の回は中止）","short":"説明会: 安藤"},{"id":"seed-z-28","date":"2026-10-22","title":"ゼミ説明会: 川崎 正隆","type":"ゼミ説明会","memo":"2限（対面・終了）","short":"説明会: 川崎"},{"id":"seed-z-29","date":"2026-10-28","title":"ゼミ説明会: 池田 圭佑","type":"ゼミ説明会","memo":"リアルタイム配信（Teams/Zoom）: 10/28(水) 18:00","short":"説明会: 池田"},{"id":"seed-z-30","date":"2026-11-06","title":"ゼミ説明会: 池田 圭佑","type":"ゼミ説明会","memo":"11/6(金) 18:00","short":"説明会: 池田"},{"id":"seed-z-31","date":"2026-11-09","title":"ゼミ説明会: 池田 圭佑","type":"ゼミ説明会","memo":"11/9(月) 昼","short":"説明会: 池田"},{"id":"seed-z-32","date":"2026-10-26","title":"ゼミ説明会: 新田 直子","type":"ゼミ説明会","memo":"10/26(月) 昼休み N103","short":"説明会: 新田"},{"id":"seed-z-33","date":"2026-10-27","title":"ゼミ説明会: 新田 直子","type":"ゼミ説明会","memo":"10/27(火) 4限 S204","short":"説明会: 新田"},{"id":"seed-z-34","date":"2026-11-05","title":"ゼミ説明会: 新田 直子","type":"ゼミ説明会","memo":"11/5(木) 11:00〜12:00 N103","short":"説明会: 新田"},{"id":"seed-z-35","date":"2026-11-09","title":"ゼミ説明会: 新田 直子","type":"ゼミ説明会","memo":"11/9(月) 昼休み N103","short":"説明会: 新田"},{"id":"seed-z-36","date":"2026-10-26","title":"ゼミ説明会: 西出 亮","type":"ゼミ説明会","memo":"10/26(月) 4限 S002","short":"説明会: 西出"},{"id":"seed-z-37","date":"2026-10-28","title":"ゼミ説明会: 西出 亮","type":"ゼミ説明会","memo":"10/28(水) 5限 S206","short":"説明会: 西出"},{"id":"seed-z-38","date":"2026-11-05","title":"ゼミ説明会: 西出 亮","type":"ゼミ説明会","memo":"11/5(木) 5限 S102","short":"説明会: 西出"},{"id":"seed-z-39","date":"2026-10-26","title":"ゼミ説明会: 中園 宏幸","type":"ゼミ説明会","memo":"10/26(月) 4限 S204","short":"説明会: 中園"},{"id":"seed-z-40","date":"2026-10-29","title":"ゼミ説明会: 中園 宏幸","type":"ゼミ説明会","memo":"10/29(木) 11:00〜12:10・3限 S206","short":"説明会: 中園"},{"id":"seed-z-41","date":"2026-10-30","title":"ゼミ説明会: 中園 宏幸","type":"ゼミ説明会","memo":"10/30(金) 3限 S205","short":"説明会: 中園"},{"id":"seed-z-42","date":"2026-11-09","title":"ゼミ説明会: 中園 宏幸","type":"ゼミ説明会","memo":"11/9(月) 4限 S204","short":"説明会: 中園"},{"id":"seed-z-43","date":"2026-11-05","title":"ゼミ説明会: 伝住 周平","type":"ゼミ説明会","memo":"11/5(木) 昼休み N108 のみ（1回だけ）","short":"説明会: 伝住"},{"id":"seed-z-44","date":"2026-10-28","title":"ゼミ説明会: 岡部 格明","type":"ゼミ説明会","memo":"10/28(水) 2限 S203","short":"説明会: 岡部"},{"id":"seed-z-45","date":"2026-10-29","title":"ゼミ説明会: 岡部 格明","type":"ゼミ説明会","memo":"10/29(木) 3・4限 S204","short":"説明会: 岡部"},{"id":"seed-z-46","date":"2026-11-06","title":"ゼミ説明会: 岡部 格明","type":"ゼミ説明会","memo":"11/6(金) 4限 S206","short":"説明会: 岡部"},{"id":"seed-z-47","date":"2026-11-09","title":"ゼミ説明会: 岡部 格明","type":"ゼミ説明会","memo":"11/9(月) 4限 S205","short":"説明会: 岡部"},{"id":"seed-z-48","date":"2026-10-26","title":"ゼミ説明会: 周 暁康","type":"ゼミ説明会","memo":"10/26(月) 昼休み S206","short":"説明会: 周"},{"id":"seed-z-49","date":"2026-10-27","title":"ゼミ説明会: 周 暁康","type":"ゼミ説明会","memo":"10/27(火) 昼休み S104","short":"説明会: 周"},{"id":"seed-z-50","date":"2026-10-26","title":"ゼミ説明会: 石橋 健","type":"ゼミ説明会","memo":"10/26(月) 5限 S102","short":"説明会: 石橋"},{"id":"seed-z-51","date":"2026-10-27","title":"ゼミ説明会: 石橋 健","type":"ゼミ説明会","memo":"10/27(火) 昼休み S103","short":"説明会: 石橋"},{"id":"seed-z-52","date":"2026-11-09","title":"ゼミ説明会: 石橋 健","type":"ゼミ説明会","memo":"11/9(月) 5限 S101","short":"説明会: 石橋"},{"id":"seed-z-53","date":"2026-11-02","title":"ゼミ説明会: 河合 由起子","type":"ゼミ説明会","memo":"リアルタイム配信: 11/2(月) 昼","short":"説明会: 河合"},{"id":"seed-z-54","date":"2026-11-06","title":"ゼミ説明会: 河合 由起子","type":"ゼミ説明会","memo":"11/6(金) 昼","short":"説明会: 河合"},{"id":"seed-z-55","date":"2026-10-26","title":"ゼミ説明会: 叢（ソウ ズイシン）","type":"ゼミ説明会","memo":"昼 リアルタイム配信 ＋ オンデマンド資料あり","short":"説明会: 叢（ソウ"},{"id":"seed-z-56","date":"2026-10-30","title":"ゼミ説明会: 叢（ソウ ズイシン）","type":"ゼミ説明会","memo":"昼 リアルタイム配信 ＋ オンデマンド資料あり","short":"説明会: 叢（ソウ"},{"id":"seed-z-57","date":"2026-11-06","title":"ゼミ説明会: 叢（ソウ ズイシン）","type":"ゼミ説明会","memo":"昼 リアルタイム配信 ＋ オンデマンド資料あり","short":"説明会: 叢（ソウ"},{"id":"seed-z-58","date":"2026-10-29","title":"ゼミ説明会: 村上 始","type":"ゼミ説明会","memo":"16:50〜・17:20〜 S103","short":"説明会: 村上"},{"id":"seed-z-59","date":"2026-11-05","title":"ゼミ説明会: 村上 始","type":"ゼミ説明会","memo":"16:50〜・17:20〜 S103","short":"説明会: 村上"}];
 function allEvents(){ return SEED_EVENTS.concat(events.filter(e=>!SEED_EVENTS.some(s=>s.date===e.date && s.title===e.title))); }
 let books = load("bds_books", []);
+let deals = load("bds_deals", []);
 let board = load("bds_board", null);
 let candidates = load("bds_candidates", []);
 let absences = load("bds_absences", {});
@@ -402,7 +429,7 @@ function setNav(key){
 }
 function route(){
   const p = parseHash();
-  document.body.classList.toggle("has-cta", (p[0]==="book" && !!p[1]) || (p[0]==="books" && p[1]==="new"));
+  document.body.classList.toggle("has-cta", (p[0]==="book" && !!p[1]) || (p[0]==="books" && p[1]==="new") || (p[0]==="deal" && !!p[1]));
   document.body.classList.toggle("bk-white", p[0]==="book" && !!p[1]);
   window.scrollTo(0,0);
   if(p[0]==="courses"){ setNav("courses"); renderCourses(); }
@@ -413,6 +440,7 @@ function route(){
   else if(p[0]==="books" && p[1]==="new"){ setNav("books"); renderBookNew(); }
   else if(p[0]==="books"){ setNav("books"); renderBooks(); }
   else if(p[0]==="book" && p[1]){ setNav("books"); renderBookDetail(p[1]); }
+  else if(p[0]==="deal" && p[1]){ setNav("books"); renderDeal(p[1]); }
   else if(p[0]==="board"){ setNav("board"); renderBoard(); }
   else if(p[0]==="reviews"){ setNav("reviews"); renderReviews(); }
   else if(p[0]==="mypage"){ setNav("mypage"); renderMypage(); }
@@ -1088,7 +1116,9 @@ function renderBookDetail(id){
   const msgs = bk.msgs || [];
   const isBuy = bk.type==="buy";
   const kv = (k,v)=>'<div class="bk-kvrow"><span>'+k+'</span><p>'+esc(v)+'</p></div>';
-  const like = (reactions["bk:"+id] || {}).heart || {c:0, mine:false};
+  const myDeal = user ? deals.find(d=>d.bookId===id && d.status!=="cancel" && (d.buyer===user.name || d.seller===user.name)) : null;
+  const bookDeals = deals.filter(d=>d.bookId===id && d.status!=="cancel");
+  const like = sbReactState("bk:"+bk.id, "heart");
   $app.innerHTML =
   '<div class="bk-dthumb">'+bookCoverHtml(bk)+bookRibbon(bk)+'<a class="bk-back" href="#/books" aria-label="戻る">‹</a></div>'
   + '<div class="bk-dhead"><h2 class="bk-dtitle">'+esc(bk.title)+'</h2>'
@@ -1103,11 +1133,14 @@ function renderBookDetail(id){
   + (msgs.length ? msgs.map(mm=>'<div class="bk-msg"><p class="bk-msg-h">'+esc(mm.name)+' <span>'+esc(mm.at||"")+'</span></p><p>'+esc(mm.text)+'</p></div>').join("") : '<p class="note">まだコメントはありません。質問や受け渡しの相談はここで。</p>')
   + '<div class="thread-form"><input id="thText" type="text" placeholder="コメントを書く"><button class="btn small bk-send" id="thSend">送信</button></div>'
   + '</div>'
+  + (mine && bookDeals.length ? '<div class="bk-band">取引の申し込み</div><div class="bk-dsec">' + bookDeals.map(d=>'<div class="listrow"><div><strong>'+esc(d.poster===user.name ? d.applicant : d.poster)+'</strong><div class="card-meta">状態：'+dealStatusLabel(d.status)+(d.proposal && d.agreed ? ' ／ '+esc(d.proposal.place)+' '+esc(d.proposal.when) : '')+'</div></div><a class="btn small" href="#/deal/'+d.id+'">取引画面</a></div>').join("") + '</div>' : '')
   + '<div class="ctabar bk-ct"><button class="ct-mini'+(like.mine?" on":"")+'" id="bkLikeBtn"><span class="ic">'+(like.mine?"❤️":"♡")+'</span><span>いいね</span>'+(like.c? '<span class="ct-n">'+like.c+'</span>' : '')+'</button>'
   + '<button class="ct-mini" id="bkCmtBtn"><span class="ic">💬</span><span>コメント</span>'+(msgs.length? '<span class="ct-n">'+msgs.length+'</span>' : '')+'</button>'
   + (mine
       ? '<button class="btn bk-cta" id="bkStateBtn">'+(bk.status==="open" ? "交渉中にする" : bk.status==="talk" ? "取引完了にする" : "出品中にもどす")+'</button>'
-      : '<button class="btn bk-cta" id="bkWantBtn">'+(isBuy ? "譲る相談をする" : "購入・取引を申し込む")+'</button>')
+      : (myDeal
+        ? '<button class="btn bk-cta" id="bkDealBtn">取引画面を開く</button>'
+        : '<button class="btn bk-cta" id="bkWantBtn">'+(isBuy ? "譲る相談をする" : "購入・取引を申し込む")+'</button>'))
   + '</div>';
   const thSend = document.getElementById("thSend");
   thSend.onclick=()=>{
@@ -1129,7 +1162,20 @@ function renderBookDetail(id){
     const inp = document.getElementById("thText"); if(inp) setTimeout(()=>inp.focus(), 350);
   };
   const wb = document.getElementById("bkWantBtn");
-  if(wb) wb.onclick=goCmt;
+  if(wb) wb.onclick=function(){
+    if(!requireUser()) return;
+    if(bk.status==="done"){ toast("この取引は終了しています"); return; }
+    const nd = { id:"dl"+Date.now(), bookId:bk.id, title:bk.title, price:bk.price, img:bk.img || "", course:bk.course || "",
+      seller: isBuy ? user.name : bk.by, buyer: isBuy ? bk.by : user.name,
+      poster: bk.by, applicant: user.name, status:"talk", proposal:null, agreed:false, paypay:"",
+      msgs:[{ name:"", sys:true, text: isBuy ? "譲る相談が始まりました。待ち合わせの場所と日時を決めましょう" : "購入・取引の申し込みがありました。待ち合わせの場所と日時を決めましょう", at:todayStr() }],
+      createdAt:Date.now(), updatedAt:Date.now() };
+    deals.unshift(nd); save("bds_deals", deals); sbPushDeal(nd);
+    if(bk.status==="open"){ bk.status="talk"; save("bds_books", books); sbPushBook(bk); }
+    navTo("#/deal/"+nd.id);
+  };
+  const db = document.getElementById("bkDealBtn");
+  if(db) db.onclick=function(){ navTo("#/deal/"+myDeal.id); };
   const cb = document.getElementById("bkCmtBtn");
   if(cb) cb.onclick=goCmt;
   const lb = document.getElementById("bkLikeBtn");
@@ -1255,6 +1301,127 @@ function renderBookNew(){
     toast(nb.type==="buy" ? "募集しました" : "出品しました");
     navTo("#/book/"+nb.id);
   };
+}
+
+
+/* ---------- deals (private transaction room) ---------- */
+let dealFormOpen = false;
+let dealScroll = false;
+function dealStatusLabel(s){ return s==="meet" ? "約束済み" : s==="done" ? "取引完了" : s==="cancel" ? "キャンセル" : "調整中"; }
+function dealSave(d){ d.updatedAt = Date.now(); save("bds_deals", deals); sbPushDeal(d); }
+function dealSys(d, text){ d.msgs.push({ name:"", sys:true, text:text, at:todayStr() }); }
+function linkify(t){
+  return esc(t).replace(/https?:\/\/[^\s<]+/g, function(u){ return '<a href="'+u+'" target="_blank" rel="noopener">'+u+'</a>'; });
+}
+function dealsHtml(){
+  if(!user) return "";
+  const mine = deals.filter(d=>d.status!=="cancel" && (d.buyer===user.name || d.seller===user.name));
+  const myBooks = books.filter(b=>b.by===user.name);
+  if(!mine.length && !myBooks.length) return "";
+  let h = '<h2 class="sec">教科書の取引</h2><section class="panel">';
+  if(mine.length) h += mine.map(d=>{
+    const other = d.buyer===user.name ? d.seller : d.buyer;
+    const role = d.seller===user.name ? "渡す側" : "受け取る側";
+    return '<div class="listrow"><div><a href="#/deal/'+d.id+'"><strong>'+esc(d.title)+'</strong></a><div class="card-meta">相手：'+esc(other)+'（'+role+'）／ ¥'+Number(d.price||0).toLocaleString()+'</div></div><span class="tag'+(d.status==="done" ? " ok" : "")+'">'+dealStatusLabel(d.status)+'</span></div>';
+  }).join("");
+  else h += '<p class="note">進行中の取引はまだありません。</p>';
+  if(myBooks.length) h += '<p class="note" style="margin-top:8px">あなたの出品：' + myBooks.map(b=>'<a href="#/book/'+b.id+'">'+esc(b.title)+'</a>（'+bookStatusLabel(b.status)+'）').join("、") + '</p>';
+  return h + '</section>';
+}
+function renderDeal(id){
+  const d = deals.find(x=>x.id===id);
+  if(!d){ $app.innerHTML = '<div class="empty">取引が見つかりませんでした。<a href="#/books">教科書売買へ</a></div>'; return; }
+  if(!user || (user.name!==d.buyer && user.name!==d.seller)){
+    $app.innerHTML = '<div class="deal-back"><a href="#/books">← 教科書売買</a></div>'
+    + '<section class="panel" style="margin-top:14px;text-align:center;padding:28px 18px"><div style="font-size:34px">🔒</div><h2 style="margin:8px 0 6px">この取引は当事者だけが見られます</h2><p class="note">待ち合わせの場所や日時は、取引する2人だけの画面で決めます。</p></section>';
+    return;
+  }
+  const bk = books.find(b=>b.id===d.bookId);
+  const iAmSeller = d.seller===user.name;
+  const other = iAmSeller ? d.buyer : d.seller;
+  const showForm = dealFormOpen || !d.proposal;
+  let meet = '<div class="deal-panel"><h3>📍 待ち合わせ</h3>';
+  if(d.status==="done") meet += '<p class="note">取引は完了しています。</p>';
+  else if(d.agreed && d.proposal){
+    meet += '<div class="meet-ok"><strong>'+esc(d.proposal.place)+'</strong><br>'+esc(d.proposal.when)+'<div class="note" style="margin-top:4px">この内容で約束済みです。変更したい時は下のチャットで相談して、新しく提案し直してください。</div></div>'
+    + '<button class="btn small ghost" id="dlRepropose" style="margin-top:8px">提案し直す</button>';
+  } else if(d.proposal){
+    meet += '<div class="meet-prop"><strong>'+esc(d.proposal.place)+'</strong><br>'+esc(d.proposal.when)
+    + '<div class="note" style="margin-top:4px">'+esc(d.proposal.by)+' さんからの提案です</div></div>';
+    if(d.proposal.by===user.name) meet += '<p class="note">相手の返事を待っています。</p><button class="btn small ghost" id="dlPropCancel">提案を取り消す</button>';
+    else meet += '<div class="row" style="margin-top:8px"><button class="btn" id="dlAccept">この内容でOK</button><button class="btn ghost" id="dlCounter">別の候補を出す</button></div>';
+  }
+  if(d.status!=="done" && showForm && !(d.agreed && d.proposal)){
+    meet += '<div class="dform"><label class="flabel">場所</label><div class="chips" id="dlPlaces">'
+    + PLACES.map(p=>'<button type="button" class="chip'+(p===(d.proposal ? d.proposal.place : "") ? " on" : "")+'" data-pl="'+esc(p)+'">'+esc(p)+'</button>').join("") + '</div>'
+    + '<label class="flabel">日時</label><input id="dlWhen" type="text" placeholder="例： 11/18（火）昼休み 12:30ごろ" value="'+(d.proposal ? esc(d.proposal.when) : "")+'">'
+    + '<button class="btn primary" id="dlPropose" style="margin-top:10px">この内容で提案する</button></div>';
+  }
+  meet += '</div>';
+  let money = '<div class="deal-panel"><h3>💴 お金</h3>';
+  if(iAmSeller){
+    money += '<p class="note">PayPayの受け取りリンクを置くと、相手がここから支払えます。もちろん当日現金の手渡しでもOKです。</p>'
+    + '<div class="row"><input id="dlPaypay" type="url" placeholder="PayPay受け取りリンク（任意）" value="'+esc(d.paypay || "")+'" style="flex:1"><button class="btn small" id="dlPaySave">保存</button></div>';
+  } else if(d.paypay){
+    money += '<a class="btn bk-pay" href="'+esc(d.paypay)+'" target="_blank" rel="noopener">PayPayで ¥'+Number(d.price||0).toLocaleString()+' を支払う</a><p class="note" style="margin-top:6px">支払ったら、下のチャットで「払いました」と一言伝えましょう。</p>';
+  } else {
+    money += '<p class="note">支払いは当日の手渡し（現金／PayPay）でOKです。相手がPayPayの受け取りリンクを置いたら、ここに支払いボタンが出ます。</p>';
+  }
+  money += '</div>';
+  const chat = '<div class="deal-panel"><h3>💬 2人だけのチャット</h3><div class="chat">'
+  + d.msgs.map(m=>{
+      if(m.sys) return '<div class="csys">'+esc(m.text)+'</div>';
+      const mineMsg = m.name===user.name;
+      return '<div class="cbub '+(mineMsg ? "me" : "you")+'">'+(mineMsg ? "" : '<span class="cb-who">'+esc(m.name)+'</span>')+linkify(m.text)+'</div>';
+    }).join("")
+  + '</div><div id="dlEnd"></div></div>';
+  const actions = d.status!=="done" && d.status!=="cancel"
+    ? '<div class="row" style="margin:14px 0 4px"><button class="btn primary" id="dlComplete">受け渡し完了にする</button><button class="btn ghost danger" id="dlCancel">取引をキャンセル</button></div>'
+    : '';
+  $app.innerHTML = '<div class="deal-back"><a href="#/books">← 教科書売買</a><a href="#/book/'+d.bookId+'">商品ページ ›</a></div>'
+  + '<div class="deal-sum"><div class="deal-thumb">'+(d.img ? '<img src="'+d.img+'" alt="">' : bookCoverHtml(bk || { title: d.title, course: d.course, type: "sell", img: "" }))+'</div><div style="min-width:0"><strong style="display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(d.title)+'</strong><div class="card-meta">¥'+Number(d.price||0).toLocaleString()+' ／ 相手：'+esc(other)+'（'+(iAmSeller ? "購入者" : "出品者")+'）</div></div><span class="tag'+(d.status==="done" ? " ok" : "")+'">'+dealStatusLabel(d.status)+'</span></div>'
+  + meet + money + chat + actions
+  + '<div class="ctabar deal-bar"><input id="dlText" type="text" placeholder="メッセージを入力" enterkeyhint="send"><button class="btn bk-send" id="dlSend">送信</button></div>';
+  let selPlace = d.proposal ? d.proposal.place : "";
+  $app.querySelectorAll("[data-pl]").forEach(b=>b.onclick=()=>{ selPlace = b.dataset.pl; $app.querySelectorAll("[data-pl]").forEach(x=>x.classList.toggle("on", x===b)); });
+  const pb = document.getElementById("dlPropose");
+  if(pb) pb.onclick=function(){
+    const w = document.getElementById("dlWhen").value.trim();
+    if(!selPlace){ toast("場所を選んでください"); return; }
+    if(!w){ toast("日時を入力してください"); return; }
+    d.proposal = { place: selPlace, when: w, by: user.name }; d.agreed = false; if(d.status==="meet") d.status = "talk";
+    dealSys(d, user.name+" さんが待ち合わせを提案しました："+selPlace+" ／ "+w);
+    dealFormOpen = false; dealScroll = true; dealSave(d); renderDeal(id);
+  };
+  const ac = document.getElementById("dlAccept");
+  if(ac) ac.onclick=function(){ d.agreed = true; d.status = "meet"; dealSys(d, "待ち合わせが決まりました："+d.proposal.place+" ／ "+d.proposal.when); dealScroll = true; dealSave(d); renderDeal(id); };
+  const ct = document.getElementById("dlCounter");
+  if(ct) ct.onclick=function(){ dealFormOpen = true; renderDeal(id); };
+  const pc = document.getElementById("dlPropCancel");
+  if(pc) pc.onclick=function(){ d.proposal = null; d.agreed = false; dealSave(d); renderDeal(id); };
+  const rp = document.getElementById("dlRepropose");
+  if(rp) rp.onclick=function(){ d.agreed = false; d.status = "talk"; dealFormOpen = true; dealSave(d); renderDeal(id); };
+  const ps = document.getElementById("dlPaySave");
+  if(ps) ps.onclick=function(){ const v = document.getElementById("dlPaypay").value.trim(); if(v && v.indexOf("https://")!==0){ toast("https:// から始まるリンクを入れてください"); return; } d.paypay = v; dealSave(d); toast("保存しました"); };
+  const sendMsg = function(){
+    const inp = document.getElementById("dlText"); const t = inp.value.trim(); if(!t) return;
+    d.msgs.push({ name: user.name, text: t, at: todayStr() }); dealScroll = true; dealSave(d); renderDeal(id);
+  };
+  const sb2 = document.getElementById("dlSend"); if(sb2) sb2.onclick = sendMsg;
+  const inp2 = document.getElementById("dlText"); if(inp2) inp2.addEventListener("keydown", e=>{ if(e.key==="Enter"){ e.preventDefault(); sendMsg(); } });
+  const cp = document.getElementById("dlComplete");
+  if(cp) cp.onclick=function(){
+    d.status = "done"; dealSys(d, "受け渡しが完了しました。おつかれさまでした！");
+    if(bk && bk.status!=="done"){ bk.status = "done"; save("bds_books", books); sbPushBook(bk); }
+    dealScroll = true; dealSave(d); toast("取引完了にしました"); renderDeal(id);
+  };
+  const cx = document.getElementById("dlCancel");
+  if(cx) cx.onclick=function(){
+    d.status = "cancel"; dealSys(d, "取引はキャンセルされました"); dealSave(d);
+    if(bk && bk.status==="talk" && !deals.some(x=>x.bookId===bk.id && x.status!=="cancel" && x.status!=="done")){ bk.status = "open"; save("bds_books", books); sbPushBook(bk); }
+    toast("取引をキャンセルしました"); navTo("#/book/"+d.bookId);
+  };
+  if(dealScroll){ dealScroll = false; const e2 = document.getElementById("dlEnd"); if(e2) e2.scrollIntoView(); }
 }
 
 /* ---------- board ---------- */
@@ -1408,7 +1575,7 @@ function renderMypage(){
   const absList = Object.keys(absences).map(id=>COURSES.find(c=>c.id===id)).filter(Boolean);
   const absHtml = '<h2 class="sec">欠席カウンター</h2>'
   + (absList.length ? '<section class="panel">' + absList.map(c=>'<div class="listrow"><div><a href="#/course/'+encodeURIComponent(c.name)+'"><strong>'+esc(c.name)+'</strong></a><div class="card-meta">'+esc(c.instructor)+' ／ '+esc(c.term||"")+' '+esc(c.schedule||"")+'</div></div><span class="abscount small">'+absences[c.id]+'回</span>'+(absences[c.id]>=3 ? '<span class="tag warn">注意</span>' : '')+'</div>').join("") + '<p class="note">目安: 5回休むと単位が危ないことが多いです。カウントは各授業ページでできます。</p></section>' : '<div class="empty">まだ登録がありません。授業ページの「欠席カウンター」から履修中の授業を登録してください。</div>');
-  $app.innerHTML = mypageTop() + absHtml +
+  $app.innerHTML = mypageTop() + dealsHtml() + absHtml +
   '<h2 class="sec">履修候補リスト</h2>'
   + '<p class="sec-note">授業ページで「履修候補に入れる」を押した授業がここにたまります。単位とテスト傾向の目安にどうぞ。</p>'
   + (list.length ? '<section class="panel">'

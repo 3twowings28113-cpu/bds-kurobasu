@@ -485,3 +485,32 @@ body.bk-white{ background:#fff }
   .bk-dthumb{ width:100vw; margin-left:calc(50% - 50vw); margin-right:0 }
   .bk-band{ width:100vw; margin-left:calc(50% - 50vw); margin-right:0; box-sizing:border-box }
 }
+
+/* ===== deals (private transaction room) ===== */
+.deal-sum{ display:flex; gap:12px; align-items:center; background:#fff; border:1px solid #ECE9E6; border-radius:12px; padding:10px 12px; margin-top:12px }
+.deal-thumb{ width:56px; height:56px; border-radius:8px; overflow:hidden; flex:none; background:#F5F2EF }
+.deal-thumb img{ width:100%; height:100%; object-fit:cover }
+.deal-thumb .bk-cover{ height:100%; aspect-ratio:auto; padding:4px }
+.deal-thumb .bk-cover::before{ display:none }
+.deal-thumb .bk-cover-t{ font-size:8.5px; -webkit-line-clamp:4 }
+.deal-panel{ background:#fff; border:1px solid #ECE9E6; border-radius:12px; padding:14px; margin-top:12px }
+.deal-panel h3{ margin:0 0 10px; font-size:15px }
+.deal-panel input[type="text"],.deal-panel input[type="url"]{ width:100%; border:1px solid #D8D2CC; border-radius:10px; padding:11px 12px; font-size:14.5px; font-family:inherit }
+.deal-panel .row input{ width:auto }
+.meet-ok{ background:#EAF7EE; border:1px solid #BEE5C8; border-radius:10px; padding:11px 12px; font-size:14.5px; line-height:1.55 }
+.meet-prop{ background:#FFF7E8; border:1px solid #F0DFB2; border-radius:10px; padding:11px 12px; font-size:14.5px; line-height:1.55 }
+.dform{ margin-top:12px }
+.chat{ display:flex; flex-direction:column; gap:8px }
+.cbub{ max-width:82%; padding:8px 11px; border-radius:14px; font-size:14px; line-height:1.55; word-break:break-word; white-space:pre-wrap }
+.cbub.me{ align-self:flex-end; background:#8C2D53; color:#fff; border-bottom-right-radius:4px }
+.cbub.you{ align-self:flex-start; background:#F5F2EF; border:1px solid #E7E2DE; border-bottom-left-radius:4px }
+.cbub .cb-who{ display:block; font-size:10.5px; color:var(--mut); margin-bottom:2px }
+.cbub a{ color:inherit; text-decoration:underline; word-break:break-all }
+.csys{ align-self:center; font-size:11.5px; color:var(--mut); background:#F1EFEC; padding:4px 10px; border-radius:999px; text-align:center }
+.deal-bar input{ flex:1; border:1px solid #D8D2CC; border-radius:999px; padding:11px 14px; font-size:14.5px; font-family:inherit; min-width:0 }
+.deal-bar .btn{ flex:none; border-radius:999px; padding:11px 18px }
+.bk-pay{ background:#FF0033; color:#fff; display:inline-block; text-align:center }
+.btn.danger{ color:#C42727 }
+
+.deal-back{ display:flex; justify-content:space-between; align-items:center; padding:12px 2px 0; font-weight:700; font-size:14.5px }
+.deal-sum .tag{ white-space:nowrap; flex:none }
