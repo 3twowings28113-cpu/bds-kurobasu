@@ -449,7 +449,7 @@ function renderHome(){
   + '</div></section>'
   + '<section class="stats">'+statItems.map(([n,l])=>'<div><strong>'+n+'</strong><span>'+l+'</span></div>').join("")+'</section>'
   + '<h2 class="sec">何をしますか</h2>'
-  + '<div class="menugrid tiles">'+ menu.map(([h,ic,ja,d,cls])=>'<a class="tile '+cls+'" href="'+h+'"><span class="tile-ic">'+ic+'</span><span class="tile-ja">'+ja+'</span><span class="tile-d">'+d+'</span></a>').join("") +'</div>'
+  + '<div class="menugrid tiles">'+ menu.map(([h,ic,ja,d,cls])=>'<a class="tile '+cls+'" href="'+h+'"><span class="tile-top"><span class="tile-ic">'+ic+'</span><span class="tile-ja">'+ja+'</span></span><span class="tile-d">'+d+'</span></a>').join("") +'</div>'
   + '<section class="panel" style="margin-top:22px"><h3>はじめての方へ</h3>'
   + '<p style="margin:4px 0">1. <strong>学生登録</strong>（学籍番号の形式チェック＋氏名・年度）で投稿できるようになります。閲覧は登録なしでOK。</p>'
   + '<p style="margin:4px 0">2. <strong>授業を探す</strong>で「定期テスト100%」「テストなし」などの条件で絞り込めます。</p>'

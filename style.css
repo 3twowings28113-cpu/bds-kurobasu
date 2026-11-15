@@ -475,3 +475,13 @@ body.bk-white{ background:#fff }
 .bk-price{ padding:2px 7px; font-size:12px }
 .tile{ height:72px; border-left:1px solid #ECE9E6; padding:8px 14px }
 .tile-ic{ font-size:16px }
+
+/* ===== v5.3 final fixes (Gemini final check) ===== */
+.tile{ height:auto; padding:12px 14px; gap:3px; justify-content:flex-start }
+.tile-top{ display:flex; align-items:center; gap:7px }
+.tile-ic{ font-size:17px }
+.tile-ja{ font-size:14.5px }
+@media (max-width:760px){
+  .bk-dthumb{ width:100vw; margin-left:calc(50% - 50vw); margin-right:0 }
+  .bk-band{ width:100vw; margin-left:calc(50% - 50vw); margin-right:0; box-sizing:border-box }
+}
