@@ -459,3 +459,19 @@ body.bk-white{ background:#fff }
 .sheet-opt.cancel{ text-align:center; color:var(--mut); font-weight:700 }
 
 .bk-dthumb .bk-cover::before{ display:none }
+
+/* ===== v5.2 UX round 3 (Gemini review #3) ===== */
+.bk-mhead{ display:flex; align-items:center; height:48px; margin:0 -4px 10px; border-bottom:1px solid var(--line) }
+.bk-x{ width:44px; height:44px; display:flex; align-items:center; justify-content:center; font-size:26px; color:#374151; line-height:1 }
+.bk-x:hover{ text-decoration:none }
+.bk-mtitle{ flex:1; text-align:center; font-weight:900; font-size:16px }
+.bk-msp{ width:44px; flex:none }
+.bk-newpage .bk-more{ border-color:#D1D5DB !important; color:#374151 !important; background:#fff }
+.bk-courselink{ color:#0073CC; font-size:12.5px; font-weight:700 }
+.bk-dprice{ display:flex; align-items:baseline; gap:7px; flex-wrap:wrap }
+.bk-dthumb{ width:calc(100% + 24px) }
+@media (min-width:761px){ .bk-dthumb{ width:calc(100% + 32px) } }
+.bk-search{ border:0; background:#F2F3F5 }
+.bk-price{ padding:2px 7px; font-size:12px }
+.tile{ height:72px; border-left:1px solid #ECE9E6; padding:8px 14px }
+.tile-ic{ font-size:16px }

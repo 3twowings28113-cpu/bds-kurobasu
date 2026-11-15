@@ -522,7 +522,7 @@ function renderCourses(){
   + studySeg("courses")
   + '<div class="filters"><div class="row">'
   + '<div class="field" style="flex:1;min-width:200px"><label>キーワード（授業名・先生・内容）</label><input type="text" id="fQ" value="'+esc(courseFilter.q)+'" placeholder="例: Python、マーケティング、福井"></div>'
-  + '</div><button type="button" class="btn small ghost" id="cFilterToggle" style="margin-top:10px">絞り込み（学期・曜日・分野・テスト割合）を開く</button>'
+  + '</div><button type="button" class="btn small ghost" id="cFilterToggle" style="margin-top:10px">詳細絞り込み（学期・曜日・テスト割合） ▾</button>'
   + '<div id="cFilterBody" style="display:none"><div class="row" style="margin-top:10px">'
   + '<div class="field"><label>学期</label><select id="fTerm"><option value="">すべて</option>'+["春","秋"].map(t=>'<option '+(courseFilter.term===t?"selected":"")+'>'+t+'</option>').join("")+'</select></div>'
   + '<div class="field"><label>曜日</label><select id="fDay"><option value="">すべて</option>'+["月","火","水","木","金","土"].map(t=>'<option '+(courseFilter.day===t?"selected":"")+'>'+t+'</option>').join("")+'</select></div>'
@@ -543,7 +543,7 @@ function renderCourses(){
   $app.querySelectorAll("[data-p]").forEach(b=>b.onclick=()=>{ courseFilter.preset=b.dataset.p; coursePage=1; renderCourses(); });
   $app.querySelectorAll("[data-page]").forEach(b=>b.onclick=()=>{ coursePage=+b.dataset.page; renderCourses(); window.scrollTo(0,0); });
   const cft = document.getElementById("cFilterToggle");
-  if(cft){ const cfb = document.getElementById("cFilterBody"); const openIt = ()=>{ if(cfb) cfb.style.display=""; cft.textContent="絞り込みを閉じる"; }; const closeIt = ()=>{ if(cfb) cfb.style.display="none"; cft.textContent="絞り込み（学期・曜日・分野・テスト割合）を開く"; }; if(courseFilter.term || courseFilter.day || courseFilter.tag || courseFilter.minTest) openIt(); cft.onclick = ()=>{ (cfb && cfb.style.display==="none") ? openIt() : closeIt(); }; }
+  if(cft){ const cfb = document.getElementById("cFilterBody"); const openIt = ()=>{ if(cfb) cfb.style.display=""; cft.textContent="詳細絞り込みを閉じる ▴"; }; const closeIt = ()=>{ if(cfb) cfb.style.display="none"; cft.textContent="詳細絞り込み（学期・曜日・テスト割合） ▾"; }; if(courseFilter.term || courseFilter.day || courseFilter.tag || courseFilter.minTest) openIt(); cft.onclick = ()=>{ (cfb && cfb.style.display==="none") ? openIt() : closeIt(); }; }
   bindCourseCards();
 }
 
@@ -1048,7 +1048,7 @@ function bookCoverHtml(bk){
   if(bk.img) return '<img class="bk-img" src="'+bk.img+'" alt="">';
   const buy = bk.type==="buy";
   return '<div class="bk-cover" style="background:'+(buy ? "#3D4E8A" : coverColor(bk.title))+'">'
-    + '<span class="bk-cover-t'+((bk.title||"").length>14 ? " long" : "")+'">'+esc(bk.title||"")+'</span>'
+    + '<span class="bk-cover-t'+((bk.title||"").length>11 ? " long" : "")+'">'+esc(bk.title||"")+'</span>'
     + (bk.course? '<span class="bk-cover-c">'+esc(bk.course)+'</span>' : '')
     + (buy? '<span class="bk-cover-w">探しています</span>' : '')
     + '</div>';
@@ -1092,7 +1092,7 @@ function renderBookDetail(id){
   $app.innerHTML =
   '<div class="bk-dthumb">'+bookCoverHtml(bk)+bookRibbon(bk)+'<a class="bk-back" href="#/books" aria-label="戻る">‹</a></div>'
   + '<div class="bk-dhead"><h2 class="bk-dtitle">'+esc(bk.title)+'</h2>'
-  + (bk.course ? '<p style="margin:2px 0"><a class="bk-courselink" href="#/course/'+encodeURIComponent(bk.course)+'/reviews">📚 '+esc(bk.course)+'</a></p>' : '')
+  + (bk.course ? '<p style="margin:2px 0"><a class="bk-courselink" href="#/course/'+encodeURIComponent(bk.course)+'/reviews">'+esc(bk.course)+' ›</a></p>' : '')
   + '<p class="bk-dprice">¥'+Number(bk.price||0).toLocaleString()+' <span class="bk-dsub">'+(isBuy? '（買います・募集）' : '（学内手渡し・送料なし）')+'</span>'+(bk.status && bk.status!=="open" ? ' <span class="bk-dstatus">'+bookStatusLabel(bk.status)+'</span>' : '')+'</p>'
   + '<p class="bk-dmeta">💬 コメント '+msgs.length+' ・ '+esc(bk.date||"")+'</p></div>'
   + '<div class="bk-band">商品の説明</div><div class="bk-dsec">'+(bk.note? '<p class="pre" style="margin:0">'+esc(bk.note)+'</p>' : '<p class="note" style="margin:0">説明はありません。</p>')+'</div>'
@@ -1148,11 +1148,10 @@ function renderBookDetail(id){
 function renderBookNew(){
   $app.innerHTML =
   '<div class="bk-newpage">'
-  + '<p class="backbar"><a href="#/books">‹ 教科書売買</a></p>'
-  + '<h2 class="sec" style="margin-top:6px">出品する</h2>'
+  + '<div class="bk-mhead"><a class="bk-x" href="#/books" aria-label="閉じる">×</a><span class="bk-mtitle">商品の出品</span><span class="bk-msp"></span></div>'
   + '<div class="segbar sub" id="bkTypeSeg"><button data-bktype="sell" class="on">売ります（出品）</button><button data-bktype="buy">買います（募集）</button></div>'
   + '<input type="hidden" id="bkType" value="sell">'
-  + '<div class="bk-photorow"><label class="bk-tile" for="bkImg"><span id="bkPhotoPh">📷<br>写真</span><img id="bkPhotoImg" style="display:none" alt=""></label>'
+  + '<div class="bk-photorow"><label class="bk-tile" for="bkImg"><span id="bkPhotoPh"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg><br>写真</span><img id="bkPhotoImg" style="display:none" alt=""></label>'
   + '<p class="bk-photonote">表紙の写真を1枚入れると見つけてもらいやすくなります。なくても、タイトルから表紙が自動で作られます。<br><button type="button" class="delbtn" id="bkImgClear" style="display:none">写真を削除する</button></p></div>'
   + '<input type="file" id="bkImg" accept="image/*" style="display:none">'
   + '<div class="bk-form1">'
@@ -1160,7 +1159,7 @@ function renderBookNew(){
   + '<div class="field"><label>商品の状態</label><button type="button" class="bk-row" id="bkCondRow"><span id="bkCondLabel">'+esc(BOOK_CONDS[2])+'</span><span class="bk-row-v">›</span></button><input type="hidden" id="bkCond" value="'+esc(BOOK_CONDS[2])+'"></div>'
   + '<div class="field"><label>価格（必須）</label><div class="bk-pricein"><span>¥</span><input id="bkPrice" type="number" min="0" inputmode="numeric" placeholder="1,200"></div></div>'
   + '<div class="field"><label>商品の説明・受け渡し条件</label><textarea id="bkNote" rows="3" placeholder="書き込みの有無、受け渡し場所・曜日の希望など"></textarea></div>'
-  + '<button type="button" class="btn small ghost" id="bkMoreBtn">詳細条件を追加する ▾</button>'
+  + '<button type="button" class="btn small ghost bk-more" id="bkMoreBtn">詳細条件を追加する ▾</button>'
   + '<div id="bkMore" style="display:none">'
   + '<div class="field" style="margin-bottom:12px"><label>関連する授業（任意）</label><input id="bkCourse" type="text" placeholder="例: ミクロ経済学"></div>'
   + '<div class="field" style="margin-bottom:12px"><label>受け渡し場所</label><div class="quickchips" id="bkPlaceChips" style="margin-top:2px">'+PLACES.map((pl,i)=>'<button type="button" class="qchip '+(i===0?"on":"")+'" data-place="'+esc(pl)+'">'+esc(pl)+'</button>').join("")+'</div><input type="hidden" id="bkPlace" value="'+esc(PLACES[0])+'"></div>'
