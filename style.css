@@ -375,3 +375,87 @@ body.has-cta .footer{ display:none }
 .bk-pricein{ display:flex; align-items:center; gap:6px; background:#fff; border:1px solid #CFCBC6; border-radius:6px; padding:0 12px }
 .bk-pricein>span{ font-weight:900; font-size:17px }
 .bk-pricein input{ flex:1; border:0 !important; text-align:right; font-size:19px; font-weight:900; padding:11px 0; outline:none; min-width:0; background:transparent }
+
+
+/* ===== v5.1 UX round 2 (Gemini review #2) ===== */
+body.has-cta .topbar{ display:none }
+body.bk-white{ background:#fff }
+.footer-in{ padding:16px 16px 84px }
+
+/* home: pill search + tiles */
+.hero-search.pill{ background:#fff; border-radius:999px; padding:4px; align-items:center; gap:6px; flex-wrap:nowrap }
+.hero-search.pill input{ flex:1; border:0; background:transparent; padding:10px 12px; font-size:15px; min-width:0; color:var(--ink) }
+.hero-search.pill input:focus{ outline:none }
+.hsearch-btn{ width:40px; height:40px; flex:none; border-radius:50%; background:var(--wine); border:0; display:flex; align-items:center; justify-content:center; cursor:pointer }
+.menugrid.tiles{ grid-template-columns:1fr 1fr; gap:10px }
+@media (min-width:761px){ .menugrid.tiles{ grid-template-columns:repeat(3,1fr) } }
+.tile{ display:flex; flex-direction:column; justify-content:center; gap:1px; height:88px; padding:10px 14px; background:#fff; border:1px solid #ECE9E6; border-left:4px solid var(--wine); border-radius:10px; color:var(--ink); box-shadow:0 1px 3px rgba(20,10,16,.05) }
+.tile.blue{ border-left-color:var(--blue) } .tile.green{ border-left-color:var(--green) }
+.tile:hover{ text-decoration:none; background:#FDF6FA }
+.tile-ic{ font-size:19px; line-height:1.1 }
+.tile-ja{ font-weight:900; font-size:15.5px }
+.tile-d{ font-size:11px; color:var(--mut); white-space:nowrap; overflow:hidden; text-overflow:ellipsis }
+
+/* one-line horizontal chip rows */
+.quickchips.hscroll{ flex-wrap:nowrap; overflow-x:auto; -webkit-overflow-scrolling:touch; padding-bottom:6px; scrollbar-width:none }
+.quickchips.hscroll::-webkit-scrollbar{ display:none }
+.quickchips.hscroll .qchip{ flex:0 0 auto }
+
+/* zemi underline subtabs */
+.subtabs{ display:flex; border-bottom:2px solid var(--line); margin:0 0 14px; overflow-x:auto }
+.subtabs button{ background:none; border:0; padding:9px 12px; font-weight:700; font-size:14px; color:var(--mut); font-family:inherit; cursor:pointer; white-space:nowrap }
+.subtabs button.on{ color:var(--wine); box-shadow:inset 0 -3px 0 var(--wine) }
+
+/* FAB variants */
+.fab.wine{ background:var(--wine); box-shadow:0 6px 18px rgba(142,52,98,.35) }
+.fab-plus{ font-size:27px; line-height:1; font-weight:400 }
+.fab svg{ display:block }
+.fab span{ font-size:11px }
+
+/* books list refinements */
+.bk-price{ padding:2px 8px; font-size:13px; border-radius:0 14px 14px 0; background:rgba(0,0,0,.7) }
+.bk-cover{ position:relative }
+.bk-cover::before{ content:""; position:absolute; inset:7px; border:1px solid rgba(255,255,255,.25); border-radius:4px; pointer-events:none }
+.bk-cover-t{ font-size:14px }
+.bk-cover-t.long{ font-size:12px }
+.bk-title{ font-size:12.5px; color:#333 }
+
+/* book detail: full-bleed + flat bands */
+.bk-dthumb{ margin:0 -12px; border-radius:0; max-height:none }
+@media (min-width:761px){ .bk-dthumb{ margin:0 -16px } .bk-band{ margin-left:-16px !important; margin-right:-16px !important; padding-left:16px !important; padding-right:16px !important } }
+.bk-dthumb .bk-cover-t{ font-size:22px }
+.bk-dthumb .bk-cover-t.long{ font-size:17px }
+.bk-back{ position:absolute; top:10px; left:10px; width:36px; height:36px; border-radius:50%; background:rgba(0,0,0,.45); color:#fff; display:flex; align-items:center; justify-content:center; font-size:23px; line-height:1; z-index:4; padding-bottom:3px }
+.bk-back:hover{ text-decoration:none }
+.bk-dsub{ font-size:11px; color:#666; font-weight:500 }
+.bk-dstatus{ font-size:12.5px; font-weight:900; color:var(--red) }
+.bk-dmeta{ color:var(--mut); font-size:12.5px; margin:8px 0 0 }
+.bk-band{ background:#F5F5F5; margin:16px -12px 0; padding:8px 12px; font-size:14px; font-weight:700; color:#666 }
+.bk-dsec{ padding:10px 2px 2px }
+.bk-dsec .bk-msg:first-child{ border-top:0 }
+.ct-mini{ background:none; border:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:0; width:56px; flex:none; font-size:10.5px; color:#555; font-family:inherit; cursor:pointer; padding:2px 0 }
+.ct-mini .ic{ font-size:19px; line-height:1.25 }
+.ct-mini.on{ color:var(--red) }
+.ct-mini .ct-n{ font-weight:900; font-size:10.5px }
+.bk-ct .bk-cta{ border-radius:4px; height:44px; padding-top:0; padding-bottom:0; align-self:center }
+
+/* book new: red-scoped form */
+.bk-newpage .segbar button.on{ color:var(--red) }
+.bk-newpage .qchip{ border-color:var(--red); color:var(--red) }
+.bk-newpage .qchip.on{ background:var(--red); color:#fff }
+.bk-photorow{ display:flex; gap:12px; align-items:center; margin-top:2px }
+.bk-tile{ width:80px; height:80px; flex:none; border:1.5px dashed #C9C4BF; border-radius:8px; background:#fff; display:flex; align-items:center; justify-content:center; text-align:center; color:var(--mut); font-size:11.5px; font-weight:700; cursor:pointer; overflow:hidden; line-height:1.45 }
+.bk-tile img{ width:100%; height:100%; object-fit:cover }
+.bk-photonote{ font-size:12.5px; color:var(--mut); margin:0 }
+.bk-form1{ display:flex; flex-direction:column; gap:13px; margin:15px 0 8px }
+.bk-form1 .field{ gap:5px }
+.bk-row{ width:100%; display:flex; justify-content:space-between; align-items:center; background:#fff; border:1px solid #CFCBC6; border-radius:6px; padding:13px 12px; font-size:15px; font-family:inherit; cursor:pointer; color:var(--ink) }
+.bk-row-v{ color:var(--mut); font-size:17px }
+.sheet-bg{ position:fixed; inset:0; background:rgba(20,10,16,.5); z-index:120; display:flex; align-items:flex-end; justify-content:center }
+.sheet{ background:#fff; width:100%; max-width:520px; border-radius:14px 14px 0 0; padding:8px 10px calc(10px + env(safe-area-inset-bottom)); max-height:82vh; overflow:auto }
+.sheet-t{ font-weight:900; text-align:center; margin:8px 0 4px; font-size:15px }
+.sheet-opt{ display:block; width:100%; text-align:left; background:none; border:0; border-top:1px solid var(--line); padding:14px 10px; font-size:15px; font-family:inherit; cursor:pointer; color:var(--ink) }
+.sheet-opt.on{ color:var(--red); font-weight:900 }
+.sheet-opt.cancel{ text-align:center; color:var(--mut); font-weight:700 }
+
+.bk-dthumb .bk-cover::before{ display:none }
